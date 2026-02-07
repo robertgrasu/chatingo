@@ -48,6 +48,12 @@ class ConversationDetail(BaseModel):
     messages: list[MessageResponse] = []
 
 
+class DailyStatItem(BaseModel):
+    date: str
+    conversations: int
+    messages: int
+
+
 class StatsResponse(BaseModel):
     total_conversations: int
     total_messages: int
@@ -55,6 +61,7 @@ class StatsResponse(BaseModel):
     total_categories: int
     conversations_today: int
     messages_today: int
+    daily: list[DailyStatItem] = []
 
 
 class CategoryCreate(BaseModel):

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Thread
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -20,6 +20,7 @@ from app.models.schemas import (
     ConversationDetail,
     ConversationListItem,
     ConversationListResponse,
+    DailyStatItem,
     DocumentCreate,
     DocumentDetail,
     DocumentResponse,
@@ -442,6 +443,35 @@ async def get_stats(db: Session = Depends(get_db)):
         db.query(Message).filter(Message.created_at >= today_start).count()
     )
 
+    # Daily stats for last 7 days
+    daily = []
+    for i in range(6, -1, -1):
+        day_start = today_start - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        day_convs = (
+            db.query(Conversation)
+            .filter(
+                Conversation.started_at >= day_start,
+                Conversation.started_at < day_end,
+            )
+            .count()
+        )
+        day_msgs = (
+            db.query(Message)
+            .filter(
+                Message.created_at >= day_start,
+                Message.created_at < day_end,
+            )
+            .count()
+        )
+        daily.append(
+            DailyStatItem(
+                date=day_start.strftime("%Y-%m-%d"),
+                conversations=day_convs,
+                messages=day_msgs,
+            )
+        )
+
     return StatsResponse(
         total_conversations=total_conversations,
         total_messages=total_messages,
@@ -449,4 +479,5 @@ async def get_stats(db: Session = Depends(get_db)):
         total_categories=total_categories,
         conversations_today=conversations_today,
         messages_today=messages_today,
+        daily=daily,
     )
