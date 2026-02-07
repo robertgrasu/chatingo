@@ -88,7 +88,7 @@ export default function Settings() {
         breadcrumbs={[{ label: 'Settings' }]}
       />
 
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left: Accordions */}
         <div className="space-y-3">
           <Accordion
