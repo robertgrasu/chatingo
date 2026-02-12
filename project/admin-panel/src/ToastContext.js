@@ -26,7 +26,7 @@ function ToastItem({ toast, onClose }) {
   const config = typeConfig[toast.type] || typeConfig.info;
   return (
     <div
-      className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 border-l-4 ${config.border} bg-white dark:bg-gray-800 shadow-lg min-w-[320px] max-w-[420px] ${
+      className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-gray-100 dark:border-gray-800 border-l-4 ${config.border} bg-white dark:bg-dark-light shadow-lg min-w-[320px] max-w-[420px] ${
         toast.exiting ? 'animate-slide-out-right' : 'animate-slide-in-right'
       }`}
     >

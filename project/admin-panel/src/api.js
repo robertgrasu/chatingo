@@ -33,6 +33,15 @@ export const getWidgetConfig = (botId = 'bot_123') =>
   api.get(`/widget/config/${botId}`);
 export const updateWidgetConfig = (data, botId = 'bot_123') =>
   api.put(`/widget/config/${botId}`, data);
+export const uploadAvatar = (file, botId = 'bot_123') => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post(`/widget/avatar/${botId}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+export const deleteAvatar = (botId = 'bot_123') =>
+  api.delete(`/widget/avatar/${botId}`);
 
 // Conversations
 export const getConversations = (params = {}) =>
@@ -43,5 +52,9 @@ export const deleteAllConversations = () => api.delete('/admin/conversations');
 
 // Stats
 export const getStats = () => api.get('/admin/stats');
+
+// Feedback / Reviews
+export const getFeedback = (params = {}) =>
+  api.get('/admin/feedback', { params });
 
 export default api;

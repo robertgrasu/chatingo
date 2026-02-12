@@ -14,7 +14,7 @@ function SkeletonBlock({ className = '' }) {
 
 export function StatCardSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 relative overflow-hidden">
+    <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-6 relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700" />
       <div className="flex items-center justify-between mb-4">
         <SkeletonBlock className="w-12 h-12 rounded-xl" />
@@ -70,7 +70,7 @@ export function MessageSkeleton({ align = 'left' }) {
 
 export function SectionSkeleton({ rows = 3 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6">
+    <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-6">
       <SkeletonBlock className="h-5 w-32 mb-4" />
       {Array.from({ length: rows }).map((_, i) => (
         <SkeletonBlock key={i} className="h-12 w-full mb-3 last:mb-0" />
