@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -63,8 +64,22 @@ class BotConfig(Base):
     bubble_icon_color = Column(String(7), default="#14161a")
     bot_message_color = Column(String(7), default="#f5f5f5")
     avatar_color = Column(String(7), default="#6366f1")
+    avatar_url = Column(Text, nullable=True)
+    gradient_end_color = Column(Text, nullable=True)
+    gradient_angle = Column(Integer, default=135)
     placeholder_text = Column(String(200), default="Mesaj...")
     position = Column(String(20), default="bottom-right")
+    widget_theme = Column(String(20), default="default")
+    show_online_status = Column(Boolean, default=True)
+    show_subtitle = Column(Boolean, default=True)
+    enable_emoji = Column(Boolean, default=True)
+    enable_attachments = Column(Boolean, default=True)
+    enable_voice = Column(Boolean, default=False)
+    send_button_color = Column(String(7), nullable=True)
+    user_message_color = Column(String(7), nullable=True)
+    bubble_icon = Column(String(20), default="chat")
+    avatar_size = Column(Integer, default=42)
+    quick_replies = Column(Text, nullable=True)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -107,12 +122,82 @@ class Message(Base):
     conversation = relationship("Conversation", back_populates="messages")
 
 
+class ConversationFeedback(Base):
+    __tablename__ = "conversation_feedback"
+
+    id = Column(String, primary_key=True, default=lambda: f"fb_{uuid.uuid4().hex[:12]}")
+    conversation_id = Column(
+        String, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=True
+    )
+    bot_id = Column(String(100), nullable=False, index=True)
+    session_id = Column(String(100), nullable=False)
+    rating = Column(Integer, nullable=False)  # 1-5 stars
+    comment = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+
 engine = create_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
+    # Migrations: add columns that create_all won't add to existing tables
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS widget_theme VARCHAR(20) DEFAULT 'default'"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS avatar_url TEXT"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS gradient_end_color TEXT"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS gradient_angle INTEGER DEFAULT 135"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS show_online_status BOOLEAN DEFAULT TRUE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS show_subtitle BOOLEAN DEFAULT TRUE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS enable_emoji BOOLEAN DEFAULT TRUE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS enable_attachments BOOLEAN DEFAULT TRUE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS enable_voice BOOLEAN DEFAULT FALSE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS send_button_color VARCHAR(7)"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS user_message_color VARCHAR(7)"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS bubble_icon VARCHAR(20) DEFAULT 'chat'"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS avatar_size INTEGER DEFAULT 42"
+            ))
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS quick_replies TEXT"
+            ))
+            conn.execute(text(
+                "ALTER TABLE conversation_feedback ADD COLUMN IF NOT EXISTS comment TEXT"
+            ))
+            conn.commit()
+        except Exception:
+            pass
+
     db = SessionLocal()
     try:
         existing = db.query(BotConfig).filter_by(bot_id="bot_123").first()

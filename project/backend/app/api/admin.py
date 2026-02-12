@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.database import (
     Category,
     Conversation,
+    ConversationFeedback,
     Document,
     Message,
     SessionLocal,
@@ -25,6 +26,8 @@ from app.models.schemas import (
     DocumentDetail,
     DocumentResponse,
     DocumentUpdate,
+    FeedbackListItem,
+    FeedbackListResponse,
     MessageResponse,
     StatsResponse,
     UploadResponse,
@@ -472,6 +475,23 @@ async def get_stats(db: Session = Depends(get_db)):
             )
         )
 
+    # Feedback stats
+    from sqlalchemy import func as sqlfunc
+    total_ratings = db.query(ConversationFeedback).count()
+    avg_result = db.query(sqlfunc.avg(ConversationFeedback.rating)).scalar()
+    average_rating = round(float(avg_result), 1) if avg_result else 0
+
+    # Rating distribution
+    rating_distribution = {}
+    if total_ratings > 0:
+        dist_rows = (
+            db.query(ConversationFeedback.rating, sqlfunc.count(ConversationFeedback.id))
+            .group_by(ConversationFeedback.rating)
+            .all()
+        )
+        for r, c in dist_rows:
+            rating_distribution[str(r)] = c
+
     return StatsResponse(
         total_conversations=total_conversations,
         total_messages=total_messages,
@@ -480,4 +500,102 @@ async def get_stats(db: Session = Depends(get_db)):
         conversations_today=conversations_today,
         messages_today=messages_today,
         daily=daily,
+        average_rating=average_rating,
+        total_ratings=total_ratings,
+        rating_distribution=rating_distribution,
+    )
+
+
+# --- Feedback / Reviews ---
+
+@router.get("/feedback", response_model=FeedbackListResponse)
+async def list_feedback(
+    page: int = 1,
+    per_page: int = 20,
+    sort: str = "newest",
+    rating_filter: int | None = None,
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import func as sqlfunc
+
+    query = db.query(ConversationFeedback)
+
+    if rating_filter is not None and 1 <= rating_filter <= 5:
+        query = query.filter(ConversationFeedback.rating == rating_filter)
+
+    total = query.count()
+
+    if sort == "oldest":
+        query = query.order_by(ConversationFeedback.created_at.asc())
+    elif sort == "highest":
+        query = query.order_by(
+            ConversationFeedback.rating.desc(),
+            ConversationFeedback.created_at.desc(),
+        )
+    elif sort == "lowest":
+        query = query.order_by(
+            ConversationFeedback.rating.asc(),
+            ConversationFeedback.created_at.desc(),
+        )
+    else:
+        query = query.order_by(ConversationFeedback.created_at.desc())
+
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, pages))
+    feedbacks = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    items = []
+    for fb in feedbacks:
+        first_message = ""
+        if fb.conversation_id:
+            first_msg = (
+                db.query(Message)
+                .filter(
+                    Message.conversation_id == fb.conversation_id,
+                    Message.role == "user",
+                )
+                .order_by(Message.created_at.asc())
+                .first()
+            )
+            if first_msg:
+                first_message = (first_msg.content or "")[:150]
+
+        items.append(
+            FeedbackListItem(
+                id=fb.id,
+                rating=fb.rating,
+                comment=fb.comment,
+                created_at=fb.created_at.isoformat(),
+                conversation_id=fb.conversation_id,
+                first_message=first_message,
+            )
+        )
+
+    # Aggregate stats (always unfiltered)
+    all_total = db.query(ConversationFeedback).count()
+    avg_result = db.query(sqlfunc.avg(ConversationFeedback.rating)).scalar()
+    average_rating = round(float(avg_result), 1) if avg_result else 0
+
+    rating_distribution = {}
+    if all_total > 0:
+        dist_rows = (
+            db.query(
+                ConversationFeedback.rating,
+                sqlfunc.count(ConversationFeedback.id),
+            )
+            .group_by(ConversationFeedback.rating)
+            .all()
+        )
+        for r, c in dist_rows:
+            rating_distribution[str(r)] = c
+
+    return FeedbackListResponse(
+        items=items,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+        average_rating=average_rating,
+        total_ratings=all_total,
+        rating_distribution=rating_distribution,
     )

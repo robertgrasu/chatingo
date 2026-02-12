@@ -62,6 +62,36 @@ class StatsResponse(BaseModel):
     conversations_today: int
     messages_today: int
     daily: list[DailyStatItem] = []
+    average_rating: float = 0
+    total_ratings: int = 0
+    rating_distribution: dict = {}
+
+
+class FeedbackCreate(BaseModel):
+    session_id: str
+    bot_id: str = "bot_123"
+    rating: int  # 1-5
+    comment: str | None = None
+
+
+class FeedbackListItem(BaseModel):
+    id: str
+    rating: int
+    comment: str | None = None
+    created_at: str
+    conversation_id: str | None = None
+    first_message: str = ""
+
+
+class FeedbackListResponse(BaseModel):
+    items: list[FeedbackListItem]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    average_rating: float = 0
+    total_ratings: int = 0
+    rating_distribution: dict = {}
 
 
 class CategoryCreate(BaseModel):
@@ -124,8 +154,22 @@ class WidgetConfigResponse(BaseModel):
     bubble_icon_color: str
     bot_message_color: str
     avatar_color: str
+    avatar_url: str | None = None
+    gradient_end_color: str | None = None
+    gradient_angle: int = 135
     placeholder_text: str
     position: str
+    widget_theme: str
+    show_online_status: bool = True
+    show_subtitle: bool = True
+    enable_emoji: bool = True
+    enable_attachments: bool = True
+    enable_voice: bool = False
+    send_button_color: str | None = None
+    user_message_color: str | None = None
+    bubble_icon: str = "chat"
+    avatar_size: int = 42
+    quick_replies: str | None = None
 
 
 class WidgetConfigUpdate(BaseModel):
@@ -138,5 +182,19 @@ class WidgetConfigUpdate(BaseModel):
     bubble_icon_color: str | None = None
     bot_message_color: str | None = None
     avatar_color: str | None = None
+    avatar_url: str | None = None
+    gradient_end_color: str | None = None
+    gradient_angle: int | None = None
     placeholder_text: str | None = None
     position: str | None = None
+    widget_theme: str | None = None
+    show_online_status: bool | None = None
+    show_subtitle: bool | None = None
+    enable_emoji: bool | None = None
+    enable_attachments: bool | None = None
+    enable_voice: bool | None = None
+    send_button_color: str | None = None
+    user_message_color: str | None = None
+    bubble_icon: str | None = None
+    avatar_size: int | None = None
+    quick_replies: str | None = None

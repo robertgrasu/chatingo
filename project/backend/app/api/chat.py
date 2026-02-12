@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.models.database import Conversation, Message, get_db
-from app.models.schemas import ChatRequest, ChatResponse
+from app.models.database import Conversation, ConversationFeedback, Message, get_db
+from app.models.schemas import ChatRequest, ChatResponse, FeedbackCreate
 from app.services.rag import generate_response
 
 router = APIRouter()
@@ -97,3 +97,27 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         sources=result["sources"],
         conversation_id=conversation.id,
     )
+
+
+@router.post("/chat/feedback")
+async def submit_feedback(data: FeedbackCreate, db: Session = Depends(get_db)):
+    # Find conversation by session_id + bot_id
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.session_id == data.session_id,
+            Conversation.bot_id == data.bot_id,
+        )
+        .first()
+    )
+
+    feedback = ConversationFeedback(
+        conversation_id=conversation.id if conversation else None,
+        bot_id=data.bot_id,
+        session_id=data.session_id,
+        rating=max(1, min(5, data.rating)),
+        comment=data.comment,
+    )
+    db.add(feedback)
+    db.commit()
+    return {"status": "ok"}
