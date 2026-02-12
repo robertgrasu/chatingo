@@ -245,7 +245,7 @@ export default function KnowledgeBase() {
     ? documents.filter((d) => d.filename.toLowerCase().includes(searchQuery.toLowerCase()))
     : documents;
 
-  const inputClass = 'w-full border border-gray-200 dark:border-gray-600 rounded-xl px-3.5 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all';
+  const inputClass = 'w-full border border-gray-200 dark:border-gray-600 rounded-xl px-3.5 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all';
 
   return (
     <div className="animate-page-enter">
@@ -256,7 +256,7 @@ export default function KnowledgeBase() {
         action={
           <button
             onClick={() => { setShowAddPanel(!showAddPanel); setError(''); }}
-            className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-5 py-2.5 rounded-xl hover:from-indigo-600 hover:to-indigo-700 text-sm font-medium shadow-lg shadow-indigo-500/20 transition-all duration-200 flex items-center gap-2"
+            className="bg-gradient-to-r from-primary to-primary-600 text-white px-5 py-2.5 rounded-xl hover:from-primary-600 hover:to-primary-700 text-sm font-medium shadow-lg shadow-primary/20 transition-all duration-200 flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -268,7 +268,7 @@ export default function KnowledgeBase() {
 
       {/* Add Content Panel */}
       {showAddPanel && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 mb-6 shadow-sm animate-scale-in">
+        <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-6 mb-6 shadow-sm animate-scale-in">
           {/* Tabs */}
           <div className="flex gap-1 mb-5 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 w-fit">
             <button
@@ -320,7 +320,7 @@ export default function KnowledgeBase() {
                     onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFileSelect(e.dataTransfer.files[0]); }}
                     onClick={() => fileInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-xl px-3.5 py-2 cursor-pointer transition-all flex items-center gap-2 ${
-                      dragOver ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
+                      dragOver ? 'border-indigo-400 bg-primary/10 dark:bg-primary/10'
                         : uploadFile ? 'border-emerald-300 dark:border-emerald-500/50 bg-emerald-50 dark:bg-emerald-500/10'
                         : 'border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500'
                     }`}
@@ -337,7 +337,7 @@ export default function KnowledgeBase() {
               <button
                 type="submit"
                 disabled={uploading || !uploadFile || !uploadCatId}
-                className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-6 py-2.5 rounded-xl hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium shadow-lg shadow-indigo-500/20 transition-all"
+                className="bg-gradient-to-r from-primary to-primary-600 text-white px-6 py-2.5 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium shadow-lg shadow-primary/20 transition-all"
               >
                 {uploading ? (
                   <span className="flex items-center gap-2">
@@ -374,7 +374,7 @@ export default function KnowledgeBase() {
               <button
                 type="submit"
                 disabled={creating || !textTitle.trim() || !textContent.trim() || !textCatId}
-                className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-6 py-2.5 rounded-xl hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium shadow-lg shadow-indigo-500/20 transition-all"
+                className="bg-gradient-to-r from-primary to-primary-600 text-white px-6 py-2.5 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium shadow-lg shadow-primary/20 transition-all"
               >
                 {creating ? (
                   <span className="flex items-center gap-2">
@@ -400,7 +400,7 @@ export default function KnowledgeBase() {
       <div className="grid grid-cols-12 gap-6">
         {/* Sidebar - Categories */}
         <div className="col-span-3">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 sticky top-8">
+          <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-5 sticky top-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900 dark:text-white">Categorii</h3>
               <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">{categories.length}</span>
@@ -412,12 +412,12 @@ export default function KnowledgeBase() {
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
                 placeholder="Categorie noua..."
-                className="flex-1 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all min-w-0"
+                className="flex-1 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all min-w-0"
               />
               <button
                 type="submit"
                 disabled={!newCatName.trim()}
-                className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-lg hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-40 transition-all shadow-lg shadow-indigo-500/20 flex-shrink-0"
+                className="bg-gradient-to-r from-primary to-primary-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-lg hover:from-primary-600 hover:to-primary-700 disabled:opacity-40 transition-all shadow-lg shadow-primary/20 flex-shrink-0"
               >
                 +
               </button>
@@ -427,7 +427,7 @@ export default function KnowledgeBase() {
               <li
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm transition-all duration-200 ${
                   selectedCat === 'all'
-                    ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                    ? 'bg-primary/10 dark:bg-primary/10 text-primary shadow-sm'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 }`}
                 onClick={() => setSelectedCat('all')}
@@ -446,7 +446,7 @@ export default function KnowledgeBase() {
                   key={cat.id}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm transition-all duration-200 group ${
                     selectedCat === cat.id
-                      ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                      ? 'bg-primary/10 dark:bg-primary/10 text-primary shadow-sm'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                   onClick={() => setSelectedCat(cat.id)}
@@ -467,11 +467,11 @@ export default function KnowledgeBase() {
                         if (e.key === 'Escape') setEditingCatId(null);
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 border border-indigo-300 dark:border-indigo-500 rounded-lg px-2 py-1 text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 min-w-0"
+                      className="flex-1 border border-primary dark:border-primary rounded-lg px-2 py-1 text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/30 min-w-0"
                     />
                   ) : (
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedCat === cat.id ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedCat === cat.id ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`} />
                       <span className="font-medium truncate">{cat.name}</span>
                       <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md flex-shrink-0">{cat.document_count}</span>
                     </div>
@@ -483,7 +483,7 @@ export default function KnowledgeBase() {
                         setEditingCatId(cat.id);
                         setEditingCatName(cat.name);
                       }}
-                      className="text-gray-400 hover:text-indigo-500 transition-all p-1"
+                      className="text-gray-400 hover:text-primary transition-all p-1"
                       title="Redenumeste"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -518,7 +518,7 @@ export default function KnowledgeBase() {
 
         {/* Main - Documents Table */}
         <div className="col-span-9">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
             {/* Table header */}
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
               <div>
@@ -537,7 +537,7 @@ export default function KnowledgeBase() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Cauta documente..."
-                  className="pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all w-56"
+                  className="pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all w-56"
                 />
               </div>
             </div>
@@ -588,8 +588,8 @@ export default function KnowledgeBase() {
                       onClick={() => handleOpenDocument(doc.id)}
                     >
                       <div className="col-span-4 flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="w-8 h-8 bg-primary/10 dark:bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                         </div>
@@ -613,7 +613,7 @@ export default function KnowledgeBase() {
                       <div className="col-span-1 flex justify-end gap-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleOpenDocument(doc.id); }}
-                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-500 transition-all p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-primary transition-all p-1.5 rounded-lg hover:bg-primary/10 dark:hover:bg-primary/10"
                           title="Editeaza"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -643,7 +643,7 @@ export default function KnowledgeBase() {
       {(editDoc || loadingDoc) && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => !saving && setEditDoc(null)}>
           <div
-            className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-scale-in border border-gray-200 dark:border-gray-700"
+            className="bg-white dark:bg-dark-light rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-scale-in border-2 border-gray-100 dark:border-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
             {loadingDoc && !editDoc ? (
@@ -658,8 +658,8 @@ export default function KnowledgeBase() {
                 {/* Modal header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5 text-indigo-500 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-10 h-10 bg-primary/10 dark:bg-primary/10 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </div>
@@ -741,7 +741,7 @@ export default function KnowledgeBase() {
                     <button
                       onClick={handleSaveDocument}
                       disabled={saving}
-                      className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-6 py-2.5 rounded-xl hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-50 text-sm font-medium shadow-lg shadow-indigo-500/20 transition-all"
+                      className="bg-gradient-to-r from-primary to-primary-600 text-white px-6 py-2.5 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-50 text-sm font-medium shadow-lg shadow-primary/20 transition-all"
                     >
                       {saving ? (
                         <span className="flex items-center gap-2">

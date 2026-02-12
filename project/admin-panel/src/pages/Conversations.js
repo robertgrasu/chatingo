@@ -132,7 +132,7 @@ export default function Conversations() {
 
       <div className="grid grid-cols-3 gap-6 h-[calc(100vh-220px)] min-h-[500px]">
         {/* Left: Conversation List */}
-        <div className="col-span-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+        <div className="col-span-1 bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
           {/* Header controls */}
           <div className="p-4 border-b border-gray-100 dark:border-gray-700 space-y-3 flex-shrink-0">
             {/* Search */}
@@ -145,7 +145,7 @@ export default function Conversations() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Cauta conversatii..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
               />
             </div>
 
@@ -154,7 +154,7 @@ export default function Conversations() {
               <select
                 value={sortBy}
                 onChange={(e) => handleSort(e.target.value)}
-                className="flex-1 text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                className="flex-1 text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               >
                 {sortOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -163,7 +163,7 @@ export default function Conversations() {
               <select
                 value={perPage}
                 onChange={(e) => handlePerPage(Number(e.target.value))}
-                className="text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all w-16"
+                className="text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-16"
               >
                 {PER_PAGE_OPTIONS.map((n) => (
                   <option key={n} value={n}>{n}</option>
@@ -195,7 +195,7 @@ export default function Conversations() {
                   key={conv.id}
                   onClick={() => selectConversation(conv)}
                   className={`p-4 border-b border-gray-50 dark:border-gray-700/50 cursor-pointer transition-all duration-150 group ${
-                    selected === conv.id ? 'bg-indigo-50/70 dark:bg-indigo-500/10' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    selected === conv.id ? 'bg-primary/10 dark:bg-primary/10' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                 >
                   <div className="flex items-start justify-between mb-1">
@@ -280,7 +280,7 @@ export default function Conversations() {
         </div>
 
         {/* Right: Conversation Detail */}
-        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+        <div className="col-span-2 bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
           {!detail && !loadingDetail ? (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
               <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -326,7 +326,7 @@ export default function Conversations() {
                     <div
                       className={`max-w-[75%] px-4 py-2.5 text-sm ${
                         msg.role === 'user'
-                          ? 'bg-indigo-500 text-white rounded-2xl rounded-br-sm'
+                          ? 'bg-primary text-white rounded-2xl rounded-br-sm'
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-2xl rounded-bl-sm'
                       }`}
                     >

@@ -4,6 +4,33 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      colors: {
+        primary: {
+          DEFAULT: '#267DFF',
+          50: '#EBF3FF',
+          100: '#D6E7FF',
+          200: '#ADCFFF',
+          300: '#85B7FF',
+          400: '#5C9FFF',
+          500: '#267DFF',
+          600: '#0062E6',
+          700: '#004AB3',
+          800: '#003380',
+          900: '#001B4D',
+        },
+        dark: {
+          DEFAULT: '#0E1726',
+          light: '#1A2332',
+          lighter: '#253345',
+        },
+        success: '#22C55E',
+        danger: '#EF4444',
+        warning: '#F59E0B',
+        purple: '#7B6AFE',
+      },
+      fontFamily: {
+        inter: ['Inter', 'system-ui', 'sans-serif'],
+      },
       keyframes: {
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },

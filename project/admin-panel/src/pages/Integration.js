@@ -56,8 +56,8 @@ export default function Integration() {
       {/* Steps */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {steps.map((step, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 flex items-start gap-4 hover:-translate-y-0.5 transition-all duration-200">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-500/20 flex-shrink-0">
+          <div key={i} className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-5 flex items-start gap-4 hover:-translate-y-0.5 transition-all duration-200">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary/20 flex-shrink-0">
               {step.num}
             </div>
             <div>
@@ -70,7 +70,7 @@ export default function Integration() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Code Block */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6">
+        <div className="lg:col-span-2 bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
@@ -128,9 +128,9 @@ export default function Integration() {
         {/* Info Panel */}
         <div className="space-y-4">
           {/* Configuration */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
+          <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-5">
             <div className="flex items-center gap-2 mb-3">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               </svg>
               <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Configurare</h4>
@@ -152,7 +152,7 @@ export default function Integration() {
           </div>
 
           {/* Requirements */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
+          <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-5">
             <div className="flex items-center gap-2 mb-3">
               <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -182,14 +182,14 @@ export default function Integration() {
           </div>
 
           {/* Help */}
-          <div className="bg-indigo-50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/10 p-5">
+          <div className="bg-primary/5 dark:bg-primary/5 rounded-xl border-2 border-primary/10 dark:border-primary/10 p-5">
             <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h4 className="font-semibold text-indigo-900 dark:text-indigo-300 text-sm">Sfat</h4>
+              <h4 className="font-semibold text-primary-800 dark:text-primary-300 text-sm">Sfat</h4>
             </div>
-            <p className="text-xs text-indigo-700 dark:text-indigo-400 leading-relaxed">
+            <p className="text-xs text-primary-700 dark:text-primary-400 leading-relaxed">
               Personalizeaza aspectul widget-ului din pagina <strong>Settings</strong> inainte de integrare. Culorile, textul si pozitia se pot modifica oricand.
             </p>
           </div>
