@@ -13,7 +13,12 @@ export async function fetchWidgetConfig() {
   const { apiUrl, botId } = getConfig();
   try {
     const res = await fetch(`${apiUrl}/api/widget/config/${botId}`);
-    return await res.json();
+    const data = await res.json();
+    // Resolve relative avatar_url to full URL
+    if (data.avatar_url && !data.avatar_url.startsWith('http')) {
+      data.avatar_url = `${apiUrl}${data.avatar_url}`;
+    }
+    return data;
   } catch {
     return {
       welcome_message: 'Bună! Cu ce te pot ajuta?',
@@ -40,4 +45,19 @@ export async function sendMessage(message, image = null) {
   });
   if (!res.ok) throw new Error('Chat request failed');
   return await res.json();
+}
+
+export async function submitFeedback(rating, comment = null) {
+  const { apiUrl, botId } = getConfig();
+  try {
+    const body = { session_id: getSessionId(), bot_id: botId, rating };
+    if (comment) body.comment = comment;
+    await fetch(`${apiUrl}/api/chat/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // Silently fail - feedback is not critical
+  }
 }
