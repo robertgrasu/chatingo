@@ -1,6 +1,7 @@
 import React from 'react';
+import { getBubbleIcon } from './BubbleIcons';
 
-export default function ChatBubble({ onClick, color, bubbleColor = '#ffffff', bubbleIconColor = '#14161a', position, isOpen }) {
+export default function ChatBubble({ onClick, color, bubbleColor = '#ffffff', bubbleIconColor = '#14161a', position, isOpen, bubbleIcon = 'chat' }) {
   const isRight = position !== 'bottom-left';
 
   return (
@@ -51,7 +52,7 @@ export default function ChatBubble({ onClick, color, bubbleColor = '#ffffff', bu
       }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
     >
-      {/* Open icon - chat bubble */}
+      {/* Open icon */}
       <div style={{
         position: 'absolute',
         display: 'flex',
@@ -63,12 +64,7 @@ export default function ChatBubble({ onClick, color, bubbleColor = '#ffffff', bu
         opacity: isOpen ? 0 : 1,
         transform: isOpen ? 'rotate(-60deg) scale(0)' : 'rotate(0deg) scale(1)',
       }}>
-        <svg width="28" height="28" viewBox="0 0 28 32">
-          <path
-            fill={bubbleIconColor}
-            d="M28 12.8C28 5.732 21.732 0 14 0S0 5.732 0 12.8c0 5.396 3.592 10.024 8.68 11.88L14 32l5.32-7.32C24.408 22.824 28 18.196 28 12.8zM8 10.4a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2z"
-          />
-        </svg>
+        {getBubbleIcon(bubbleIcon, 28, bubbleIconColor)}
       </div>
       {/* Minimize icon - down chevron */}
       <div style={{

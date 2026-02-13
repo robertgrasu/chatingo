@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import FeedbackCard from './FeedbackCard';
 
 /* Relative time in Romanian */
 function timeAgo(ts) {
@@ -70,7 +71,7 @@ function renderText(text) {
   return elements;
 }
 
-export default function MessageList({ messages, isLoading, color, botName = 'AI Assistant', botSubtitle = 'AI Agent', botMessageColor = '#f5f5f5' }) {
+export default function MessageList({ messages, isLoading, color, botName = 'AI Assistant', botSubtitle = 'AI Agent', botMessageColor = '#f5f5f5', avatarUrl, userMessageColor, onFeedback, feedbackSubmitted }) {
   const endRef = useRef(null);
   const [, setTick] = useState(0);
 
@@ -93,6 +94,9 @@ export default function MessageList({ messages, isLoading, color, botName = 'AI 
       backgroundColor: '#fff',
     }}>
       {messages.map((msg, i) => {
+        if (msg.role === 'feedback') {
+          return <FeedbackCard key={i} onSubmit={onFeedback} color={color} submitted={feedbackSubmitted} />;
+        }
         const isUser = msg.role === 'user';
         return (
           <div key={i} className="cw-msg">
@@ -107,7 +111,7 @@ export default function MessageList({ messages, isLoading, color, botName = 'AI 
                 fontSize: '14px',
                 lineHeight: '20px',
                 wordBreak: 'break-word',
-                backgroundColor: isUser ? color : botMessageColor,
+                backgroundColor: isUser ? (userMessageColor || color) : botMessageColor,
                 color: isUser ? '#fff' : '#1a1a1a',
               }}>
                 {msg.image && (
