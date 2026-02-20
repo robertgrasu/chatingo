@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getWidgetConfig, updateWidgetConfig, uploadAvatar, deleteAvatar } from '../api';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../ToastContext';
+import { useBot } from '../BotContext';
 
 function isLightColor(hex) {
   if (!hex || hex.length < 7) return true;
@@ -165,6 +166,7 @@ function MiniAvatar({ size = 18, color, iconSize = 8, avatarUrl, borderStyle }) 
 
 export default function Settings() {
   const { addToast } = useToast();
+  const { selectedBotId } = useBot();
   const [config, setConfig] = useState({
     welcome_message: '',
     bot_name: 'AI Assistant',
@@ -211,8 +213,8 @@ export default function Settings() {
   ];
 
   useEffect(() => {
-    getWidgetConfig().then((res) => setConfig(res.data));
-  }, []);
+    getWidgetConfig(selectedBotId).then((res) => setConfig(res.data));
+  }, [selectedBotId]);
 
   /* Initialize preview messages */
   useEffect(() => {
@@ -253,7 +255,7 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateWidgetConfig(config);
+      await updateWidgetConfig(config, selectedBotId);
       addToast('Setarile au fost salvate cu succes!', 'success');
     } catch {
       addToast('Eroare la salvarea setarilor.', 'error');
@@ -267,7 +269,7 @@ export default function Settings() {
     if (!file) return;
     setUploadingAvatar(true);
     try {
-      const res = await uploadAvatar(file);
+      const res = await uploadAvatar(file, selectedBotId);
       const url = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}${res.data.avatar_url}`;
       setConfig((prev) => ({ ...prev, avatar_url: url }));
       addToast('Avatar incarcat cu succes!', 'success');
@@ -281,7 +283,7 @@ export default function Settings() {
 
   const handleAvatarDelete = async () => {
     try {
-      await deleteAvatar();
+      await deleteAvatar(selectedBotId);
       setConfig((prev) => ({ ...prev, avatar_url: null }));
       addToast('Avatar sters.', 'success');
     } catch {

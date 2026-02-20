@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getFeedback, getConversation } from '../api';
+import { useBot } from '../BotContext';
 import PageHeader from '../components/PageHeader';
 import { MessageSkeleton } from '../components/Skeleton';
 import { timeAgo } from '../utils';
@@ -24,6 +25,7 @@ function Stars({ rating, size = 'w-3.5 h-3.5' }) {
 }
 
 export default function Reviews() {
+  const { selectedBotId } = useBot();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -38,12 +40,12 @@ export default function Reviews() {
 
   const loadFeedback = useCallback(() => {
     setLoading(true);
-    const params = { page, per_page: perPage, sort: sortBy };
+    const params = { page, per_page: perPage, sort: sortBy, bot_id: selectedBotId };
     if (ratingFilter !== null) params.rating_filter = ratingFilter;
     getFeedback(params)
       .then((res) => setData(res.data))
       .finally(() => setLoading(false));
-  }, [page, perPage, sortBy, ratingFilter]);
+  }, [page, perPage, sortBy, ratingFilter, selectedBotId]);
 
   useEffect(() => { loadFeedback(); }, [loadFeedback]);
 

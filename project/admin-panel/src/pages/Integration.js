@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../ToastContext';
+import { useBot } from '../BotContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export default function Integration() {
   const { addToast } = useToast();
+  const { selectedBotId } = useBot();
   const [copied, setCopied] = useState(false);
 
   const embedCode = `<script>
   window.chatbotConfig = {
-    botId: 'bot_123',
+    botId: '${selectedBotId}',
     apiUrl: '${API_URL}'
   };
 </script>
@@ -138,7 +140,7 @@ export default function Integration() {
             <div className="space-y-2 text-xs text-gray-500 dark:text-gray-400">
               <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-700">
                 <span>Bot ID</span>
-                <span className="font-mono text-gray-700 dark:text-gray-300">bot_123</span>
+                <span className="font-mono text-gray-700 dark:text-gray-300">{selectedBotId}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-700">
                 <span>API URL</span>

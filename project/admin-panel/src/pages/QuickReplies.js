@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getWidgetConfig, updateWidgetConfig } from '../api';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../ToastContext';
+import { useBot } from '../BotContext';
 
 export default function QuickReplies() {
   const [replies, setReplies] = useState([]);
@@ -9,9 +10,10 @@ export default function QuickReplies() {
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState(null);
   const toast = useToast();
+  const { selectedBotId } = useBot();
 
   useEffect(() => {
-    getWidgetConfig().then((res) => {
+    getWidgetConfig(selectedBotId).then((res) => {
       setConfig(res.data);
       try {
         const parsed = JSON.parse(res.data.quick_replies || '[]');
@@ -20,14 +22,14 @@ export default function QuickReplies() {
         setReplies([]);
       }
     }).finally(() => setLoading(false));
-  }, []);
+  }, [selectedBotId]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       // Filter out empty replies
       const cleaned = replies.filter((r) => r.trim() !== '');
-      await updateWidgetConfig({ quick_replies: JSON.stringify(cleaned) });
+      await updateWidgetConfig({ quick_replies: JSON.stringify(cleaned) }, selectedBotId);
       setReplies(cleaned);
       toast.success('Raspunsurile rapide au fost salvate!');
     } catch {

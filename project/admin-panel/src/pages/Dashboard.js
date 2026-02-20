@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getStats, getConversations } from '../api';
+import { useBot } from '../BotContext';
 import PageHeader from '../components/PageHeader';
 import { timeAgo } from '../utils';
 
@@ -9,13 +10,15 @@ export default function Dashboard() {
   const [recentConvs, setRecentConvs] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { selectedBotId } = useBot();
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
-      getStats().then((res) => setStats(res.data)),
-      getConversations({ per_page: 5 }).then((res) => setRecentConvs(res.data.items || res.data || [])),
+      getStats(selectedBotId).then((res) => setStats(res.data)),
+      getConversations({ per_page: 5, bot_id: selectedBotId }).then((res) => setRecentConvs(res.data.items || res.data || [])),
     ]).finally(() => setLoading(false));
-  }, []);
+  }, [selectedBotId]);
 
   return (
     <div className="animate-page-enter">

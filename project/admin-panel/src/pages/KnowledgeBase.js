@@ -17,6 +17,7 @@ import PageHeader from '../components/PageHeader';
 import ConfirmModal from '../components/ConfirmModal';
 import { TableRowSkeleton } from '../components/Skeleton';
 import { useToast } from '../ToastContext';
+import { useBot } from '../BotContext';
 import { formatDate } from '../utils';
 
 const statusConfig = {
@@ -27,6 +28,7 @@ const statusConfig = {
 
 export default function KnowledgeBase() {
   const { addToast } = useToast();
+  const { selectedBotId } = useBot();
   const [categories, setCategories] = useState([]);
   const [selectedCat, setSelectedCat] = useState('all');
   const [documents, setDocuments] = useState([]);
@@ -70,9 +72,9 @@ export default function KnowledgeBase() {
   const [error, setError] = useState('');
 
   const loadCategories = useCallback(async () => {
-    const res = await getCategories();
+    const res = await getCategories(selectedBotId);
     setCategories(res.data);
-  }, []);
+  }, [selectedBotId]);
 
   const loadDocuments = useCallback(async (catId) => {
     setLoadingDocs(true);

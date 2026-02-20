@@ -4,12 +4,14 @@ import PageHeader from '../components/PageHeader';
 import ConfirmModal from '../components/ConfirmModal';
 import { ConversationSkeleton, MessageSkeleton } from '../components/Skeleton';
 import { useToast } from '../ToastContext';
+import { useBot } from '../BotContext';
 import { timeAgo } from '../utils';
 
 const PER_PAGE_OPTIONS = [15, 30, 50];
 
 export default function Conversations() {
   const { addToast } = useToast();
+  const { selectedBotId } = useBot();
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -28,7 +30,7 @@ export default function Conversations() {
 
   const loadConversations = useCallback(() => {
     setLoading(true);
-    getConversations({ page, per_page: perPage, sort: sortBy, search: searchQuery })
+    getConversations({ page, per_page: perPage, sort: sortBy, search: searchQuery, bot_id: selectedBotId })
       .then((res) => {
         setConversations(res.data.items);
         setTotalItems(res.data.total);
@@ -36,7 +38,7 @@ export default function Conversations() {
       })
       .catch(() => addToast('Eroare la incarcarea conversatiilor.', 'error'))
       .finally(() => setLoading(false));
-  }, [page, perPage, sortBy, searchQuery, addToast]);
+  }, [page, perPage, sortBy, searchQuery, selectedBotId, addToast]);
 
   useEffect(() => {
     loadConversations();
@@ -83,7 +85,7 @@ export default function Conversations() {
       title: 'Sterge TOATE conversatiile',
       message: `Sigur vrei sa stergi toate cele ${totalItems} conversatii? Aceasta actiune nu poate fi anulata.`,
       onConfirm: async () => {
-        await deleteAllConversations();
+        await deleteAllConversations(selectedBotId);
         setSelected(null);
         setDetail(null);
         addToast('Toate conversatiile au fost sterse.', 'success');
