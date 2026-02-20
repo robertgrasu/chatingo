@@ -19,9 +19,9 @@ Răspunde în limba în care ți se pune întrebarea.
 """
 
 
-def generate_response(user_message: str) -> dict:
+def generate_response(user_message: str, bot_id: str = None) -> dict:
     """Search knowledge base and generate a response."""
-    matches = search_similar(user_message, top_k=3)
+    matches = search_similar(user_message, top_k=3, bot_id=bot_id)
 
     if not matches:
         # Still send to GPT for greetings and general conversation
