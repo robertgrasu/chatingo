@@ -94,8 +94,28 @@ class FeedbackListResponse(BaseModel):
     rating_distribution: dict = {}
 
 
+class BotCreate(BaseModel):
+    bot_name: str = "AI Assistant"
+    welcome_message: str = "Buna! Cu ce te pot ajuta?"
+    primary_color: str = "#6366f1"
+
+
+class BotListItem(BaseModel):
+    bot_id: str
+    bot_name: str
+    primary_color: str
+    created_at: str = ""
+    document_count: int = 0
+    conversation_count: int = 0
+
+
+class BotListResponse(BaseModel):
+    bots: list[BotListItem]
+
+
 class CategoryCreate(BaseModel):
     name: str
+    bot_id: str = "bot_123"
 
 
 class CategoryUpdate(BaseModel):

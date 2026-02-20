@@ -76,7 +76,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     db.add(user_msg)
 
     # Generate response
-    result = generate_response(request.message)
+    result = generate_response(request.message, bot_id=request.bot_id)
 
     # Save assistant message
     assistant_msg = Message(

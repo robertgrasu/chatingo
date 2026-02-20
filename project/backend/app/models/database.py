@@ -24,6 +24,7 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    bot_id = Column(String(100), nullable=False, index=True, default="bot_123")
     name = Column(String(255), nullable=False)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
@@ -38,6 +39,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    bot_id = Column(String(100), nullable=False, index=True, default="bot_123")
     filename = Column(String(500), nullable=False)
     category_id = Column(String, ForeignKey("categories.id"), nullable=False)
     content = Column(Text, nullable=True)
@@ -193,6 +195,19 @@ def init_db():
             ))
             conn.execute(text(
                 "ALTER TABLE conversation_feedback ADD COLUMN IF NOT EXISTS comment TEXT"
+            ))
+            # Multi-bot: add bot_id to categories and documents
+            conn.execute(text(
+                "ALTER TABLE categories ADD COLUMN IF NOT EXISTS bot_id VARCHAR(100) DEFAULT 'bot_123'"
+            ))
+            conn.execute(text(
+                "ALTER TABLE documents ADD COLUMN IF NOT EXISTS bot_id VARCHAR(100) DEFAULT 'bot_123'"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_categories_bot_id ON categories (bot_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_documents_bot_id ON documents (bot_id)"
             ))
             conn.commit()
         except Exception:

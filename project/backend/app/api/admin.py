@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.models.database import (
+    BotConfig,
     Category,
     Conversation,
     ConversationFeedback,
@@ -15,6 +16,9 @@ from app.models.database import (
     get_db,
 )
 from app.models.schemas import (
+    BotCreate,
+    BotListItem,
+    BotListResponse,
     CategoryCreate,
     CategoryResponse,
     CategoryUpdate,
@@ -32,18 +36,90 @@ from app.models.schemas import (
     StatsResponse,
     UploadResponse,
 )
-from app.services.embeddings import add_chunks, delete_document_chunks
+from app.services.embeddings import add_chunks, delete_bot_chunks, delete_document_chunks
 from app.utils.text_splitter import split_text
 
 router = APIRouter(prefix="/admin")
+
+
+# --- Bots ---
+
+
+@router.get("/bots", response_model=BotListResponse)
+async def list_bots(db: Session = Depends(get_db)):
+    bots = db.query(BotConfig).order_by(BotConfig.created_at.desc()).all()
+    result = []
+    for bot in bots:
+        doc_count = db.query(Document).filter(Document.bot_id == bot.bot_id).count()
+        conv_count = db.query(Conversation).filter(Conversation.bot_id == bot.bot_id).count()
+        result.append(
+            BotListItem(
+                bot_id=bot.bot_id,
+                bot_name=bot.bot_name or "AI Assistant",
+                primary_color=bot.primary_color or "#6366f1",
+                created_at=bot.created_at.isoformat() if bot.created_at else "",
+                document_count=doc_count,
+                conversation_count=conv_count,
+            )
+        )
+    return BotListResponse(bots=result)
+
+
+@router.post("/bots")
+async def create_bot(data: BotCreate, db: Session = Depends(get_db)):
+    bot_id = f"bot_{uuid.uuid4().hex[:8]}"
+    config = BotConfig(
+        bot_id=bot_id,
+        bot_name=data.bot_name,
+        welcome_message=data.welcome_message,
+        primary_color=data.primary_color,
+    )
+    db.add(config)
+    db.commit()
+    return {"bot_id": bot_id, "status": "created"}
+
+
+@router.delete("/bots/{bot_id}")
+async def delete_bot(bot_id: str, db: Session = Depends(get_db)):
+    config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Bot not found")
+
+    # Delete ChromaDB chunks
+    try:
+        delete_bot_chunks(bot_id)
+    except Exception:
+        pass
+
+    # Delete feedback
+    db.query(ConversationFeedback).filter(ConversationFeedback.bot_id == bot_id).delete()
+
+    # Delete messages via conversations
+    conv_ids = [c.id for c in db.query(Conversation).filter(Conversation.bot_id == bot_id).all()]
+    if conv_ids:
+        db.query(Message).filter(Message.conversation_id.in_(conv_ids)).delete(synchronize_session=False)
+
+    # Delete conversations
+    db.query(Conversation).filter(Conversation.bot_id == bot_id).delete()
+
+    # Delete documents
+    db.query(Document).filter(Document.bot_id == bot_id).delete()
+
+    # Delete categories
+    db.query(Category).filter(Category.bot_id == bot_id).delete()
+
+    # Delete config
+    db.delete(config)
+    db.commit()
+    return {"status": "deleted"}
 
 
 # --- Categories ---
 
 
 @router.get("/categories", response_model=list[CategoryResponse])
-async def list_categories(db: Session = Depends(get_db)):
-    categories = db.query(Category).all()
+async def list_categories(bot_id: str = "bot_123", db: Session = Depends(get_db)):
+    categories = db.query(Category).filter(Category.bot_id == bot_id).all()
     result = []
     for cat in categories:
         doc_count = db.query(Document).filter(Document.category_id == cat.id).count()
@@ -55,7 +131,7 @@ async def list_categories(db: Session = Depends(get_db)):
 
 @router.post("/categories", response_model=CategoryResponse)
 async def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
-    category = Category(name=data.name)
+    category = Category(name=data.name, bot_id=data.bot_id)
     db.add(category)
     db.commit()
     db.refresh(category)
@@ -106,9 +182,11 @@ async def delete_category(category_id: str, db: Session = Depends(get_db)):
 
 @router.get("/documents", response_model=list[DocumentResponse])
 async def list_documents(
-    category_id: str | None = None, db: Session = Depends(get_db)
+    category_id: str | None = None, bot_id: str | None = None, db: Session = Depends(get_db)
 ):
     query = db.query(Document)
+    if bot_id:
+        query = query.filter(Document.bot_id == bot_id)
     if category_id:
         query = query.filter(Document.category_id == category_id)
     documents = query.order_by(Document.created_at.desc()).all()
@@ -141,12 +219,12 @@ async def get_document(document_id: str, db: Session = Depends(get_db)):
     )
 
 
-def _process_document(document_id: str, text: str, category_id: str, filename: str):
+def _process_document(document_id: str, text: str, category_id: str, filename: str, bot_id: str = "bot_123"):
     """Background processing: split text, create embeddings, update status."""
     db = SessionLocal()
     try:
         chunks = split_text(text)
-        chunk_count = add_chunks(chunks, document_id, category_id, filename)
+        chunk_count = add_chunks(chunks, document_id, category_id, filename, bot_id=bot_id)
 
         doc = db.query(Document).filter(Document.id == document_id).first()
         if doc:
@@ -167,6 +245,7 @@ def _process_document(document_id: str, text: str, category_id: str, filename: s
 async def upload_document(
     file: UploadFile = File(...),
     category_id: str = Form(...),
+    bot_id: str = Form("bot_123"),
     db: Session = Depends(get_db),
 ):
     # Validate category exists
@@ -186,6 +265,7 @@ async def upload_document(
     document_id = str(uuid.uuid4())
     document = Document(
         id=document_id,
+        bot_id=bot_id,
         filename=file.filename,
         category_id=category_id,
         content=text,
@@ -197,7 +277,7 @@ async def upload_document(
     # Process in background thread
     thread = Thread(
         target=_process_document,
-        args=(document_id, text, category_id, file.filename),
+        args=(document_id, text, category_id, file.filename, bot_id),
     )
     thread.start()
 
@@ -211,9 +291,11 @@ async def create_text_document(data: DocumentCreate, db: Session = Depends(get_d
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
+    bot_id = category.bot_id or "bot_123"
     document_id = str(uuid.uuid4())
     document = Document(
         id=document_id,
+        bot_id=bot_id,
         filename=data.title,
         category_id=data.category_id,
         content=data.content,
@@ -225,7 +307,7 @@ async def create_text_document(data: DocumentCreate, db: Session = Depends(get_d
     # Process in background thread
     thread = Thread(
         target=_process_document,
-        args=(document_id, data.content, data.category_id, data.title),
+        args=(document_id, data.content, data.category_id, data.title, bot_id),
     )
     thread.start()
 
@@ -267,7 +349,7 @@ async def update_document(
 
         thread = Thread(
             target=_process_document,
-            args=(document_id, data.content, doc.category_id, doc.filename),
+            args=(document_id, data.content, doc.category_id, doc.filename, doc.bot_id),
         )
         thread.start()
     else:
@@ -311,9 +393,12 @@ async def list_conversations(
     per_page: int = 20,
     sort: str = "newest",
     search: str = "",
+    bot_id: str | None = None,
     db: Session = Depends(get_db),
 ):
     query = db.query(Conversation)
+    if bot_id:
+        query = query.filter(Conversation.bot_id == bot_id)
 
     # Server-side search
     if search:
@@ -416,10 +501,17 @@ async def delete_conversation(conversation_id: str, db: Session = Depends(get_db
 
 
 @router.delete("/conversations")
-async def delete_all_conversations(db: Session = Depends(get_db)):
-    count = db.query(Conversation).count()
-    db.query(Message).delete()
-    db.query(Conversation).delete()
+async def delete_all_conversations(bot_id: str | None = None, db: Session = Depends(get_db)):
+    if bot_id:
+        conv_ids = [c.id for c in db.query(Conversation).filter(Conversation.bot_id == bot_id).all()]
+        count = len(conv_ids)
+        if conv_ids:
+            db.query(Message).filter(Message.conversation_id.in_(conv_ids)).delete(synchronize_session=False)
+            db.query(Conversation).filter(Conversation.bot_id == bot_id).delete()
+    else:
+        count = db.query(Conversation).count()
+        db.query(Message).delete()
+        db.query(Conversation).delete()
     db.commit()
     return {"status": "deleted", "count": count}
 
@@ -428,45 +520,59 @@ async def delete_all_conversations(db: Session = Depends(get_db)):
 
 
 @router.get("/stats", response_model=StatsResponse)
-async def get_stats(db: Session = Depends(get_db)):
+async def get_stats(bot_id: str | None = None, db: Session = Depends(get_db)):
     today_start = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    total_conversations = db.query(Conversation).count()
-    total_messages = db.query(Message).count()
-    total_documents = db.query(Document).count()
-    total_categories = db.query(Category).count()
-    conversations_today = (
-        db.query(Conversation)
-        .filter(Conversation.started_at >= today_start)
-        .count()
-    )
-    messages_today = (
-        db.query(Message).filter(Message.created_at >= today_start).count()
-    )
+    conv_q = db.query(Conversation)
+    doc_q = db.query(Document)
+    cat_q = db.query(Category)
+    fb_q = db.query(ConversationFeedback)
+    if bot_id:
+        conv_q = conv_q.filter(Conversation.bot_id == bot_id)
+        doc_q = doc_q.filter(Document.bot_id == bot_id)
+        cat_q = cat_q.filter(Category.bot_id == bot_id)
+        fb_q = fb_q.filter(ConversationFeedback.bot_id == bot_id)
+
+    total_conversations = conv_q.count()
+    total_documents = doc_q.count()
+    total_categories = cat_q.count()
+
+    # Messages need join through conversations for bot_id filtering
+    if bot_id:
+        conv_ids = [c.id for c in conv_q.all()]
+        msg_q = db.query(Message).filter(Message.conversation_id.in_(conv_ids)) if conv_ids else db.query(Message).filter(Message.id == None)
+    else:
+        msg_q = db.query(Message)
+
+    total_messages = msg_q.count()
+    conversations_today = conv_q.filter(Conversation.started_at >= today_start).count()
+    messages_today = msg_q.filter(Message.created_at >= today_start).count()
 
     # Daily stats for last 7 days
     daily = []
     for i in range(6, -1, -1):
         day_start = today_start - timedelta(days=i)
         day_end = day_start + timedelta(days=1)
-        day_convs = (
-            db.query(Conversation)
-            .filter(
-                Conversation.started_at >= day_start,
-                Conversation.started_at < day_end,
-            )
-            .count()
+        day_conv_q = db.query(Conversation).filter(
+            Conversation.started_at >= day_start,
+            Conversation.started_at < day_end,
         )
-        day_msgs = (
-            db.query(Message)
-            .filter(
-                Message.created_at >= day_start,
-                Message.created_at < day_end,
-            )
-            .count()
+        if bot_id:
+            day_conv_q = day_conv_q.filter(Conversation.bot_id == bot_id)
+        day_convs = day_conv_q.count()
+
+        day_msg_q = db.query(Message).filter(
+            Message.created_at >= day_start,
+            Message.created_at < day_end,
         )
+        if bot_id and conv_ids:
+            day_msg_q = day_msg_q.filter(Message.conversation_id.in_(conv_ids))
+        elif bot_id:
+            day_msg_q = day_msg_q.filter(Message.id == None)
+        day_msgs = day_msg_q.count()
+
         daily.append(
             DailyStatItem(
                 date=day_start.strftime("%Y-%m-%d"),
@@ -477,18 +583,23 @@ async def get_stats(db: Session = Depends(get_db)):
 
     # Feedback stats
     from sqlalchemy import func as sqlfunc
-    total_ratings = db.query(ConversationFeedback).count()
-    avg_result = db.query(sqlfunc.avg(ConversationFeedback.rating)).scalar()
+    total_ratings = fb_q.count()
+    avg_q = db.query(sqlfunc.avg(ConversationFeedback.rating))
+    if bot_id:
+        avg_q = avg_q.filter(ConversationFeedback.bot_id == bot_id)
+    avg_result = avg_q.scalar()
     average_rating = round(float(avg_result), 1) if avg_result else 0
 
     # Rating distribution
     rating_distribution = {}
     if total_ratings > 0:
-        dist_rows = (
-            db.query(ConversationFeedback.rating, sqlfunc.count(ConversationFeedback.id))
-            .group_by(ConversationFeedback.rating)
-            .all()
+        dist_q = db.query(
+            ConversationFeedback.rating,
+            sqlfunc.count(ConversationFeedback.id),
         )
+        if bot_id:
+            dist_q = dist_q.filter(ConversationFeedback.bot_id == bot_id)
+        dist_rows = dist_q.group_by(ConversationFeedback.rating).all()
         for r, c in dist_rows:
             rating_distribution[str(r)] = c
 
@@ -514,11 +625,14 @@ async def list_feedback(
     per_page: int = 20,
     sort: str = "newest",
     rating_filter: int | None = None,
+    bot_id: str | None = None,
     db: Session = Depends(get_db),
 ):
     from sqlalchemy import func as sqlfunc
 
     query = db.query(ConversationFeedback)
+    if bot_id:
+        query = query.filter(ConversationFeedback.bot_id == bot_id)
 
     if rating_filter is not None and 1 <= rating_filter <= 5:
         query = query.filter(ConversationFeedback.rating == rating_filter)
@@ -571,21 +685,26 @@ async def list_feedback(
             )
         )
 
-    # Aggregate stats (always unfiltered)
-    all_total = db.query(ConversationFeedback).count()
-    avg_result = db.query(sqlfunc.avg(ConversationFeedback.rating)).scalar()
+    # Aggregate stats (unfiltered by rating_filter, but scoped by bot_id)
+    agg_q = db.query(ConversationFeedback)
+    if bot_id:
+        agg_q = agg_q.filter(ConversationFeedback.bot_id == bot_id)
+    all_total = agg_q.count()
+    avg_q = db.query(sqlfunc.avg(ConversationFeedback.rating))
+    if bot_id:
+        avg_q = avg_q.filter(ConversationFeedback.bot_id == bot_id)
+    avg_result = avg_q.scalar()
     average_rating = round(float(avg_result), 1) if avg_result else 0
 
     rating_distribution = {}
     if all_total > 0:
-        dist_rows = (
-            db.query(
-                ConversationFeedback.rating,
-                sqlfunc.count(ConversationFeedback.id),
-            )
-            .group_by(ConversationFeedback.rating)
-            .all()
+        dist_q = db.query(
+            ConversationFeedback.rating,
+            sqlfunc.count(ConversationFeedback.id),
         )
+        if bot_id:
+            dist_q = dist_q.filter(ConversationFeedback.bot_id == bot_id)
+        dist_rows = dist_q.group_by(ConversationFeedback.rating).all()
         for r, c in dist_rows:
             rating_distribution[str(r)] = c
 

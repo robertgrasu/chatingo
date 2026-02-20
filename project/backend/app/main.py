@@ -32,6 +32,14 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 @app.on_event("startup")
 async def startup():
     init_db()
+    # Migrate existing ChromaDB chunks to include bot_id
+    from app.services.embeddings import migrate_chunks_add_bot_id
+    try:
+        count = migrate_chunks_add_bot_id()
+        if count > 0:
+            print(f"Migrated {count} ChromaDB chunks to include bot_id")
+    except Exception as e:
+        print(f"ChromaDB migration note: {e}")
 
 
 @app.get("/")
