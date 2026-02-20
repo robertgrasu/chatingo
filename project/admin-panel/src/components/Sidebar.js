@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { getStats } from '../api';
+import { useBot } from '../BotContext';
 
 const menuItems = [
   {
@@ -46,6 +47,13 @@ const menuItems = [
   {
     section: 'Settings',
     items: [
+      { to: '/bots', label: 'Botii Mei', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path opacity="0.3" d="M15.5 7.5C15.5 9.433 13.933 11 12 11C10.067 11 8.5 9.433 8.5 7.5C8.5 5.567 10.067 4 12 4C13.933 4 15.5 5.567 15.5 7.5Z" fill="currentColor"/>
+          <path d="M19.5 20.5C19.5 16.358 16.142 13 12 13C7.858 13 4.5 16.358 4.5 20.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          <circle cx="18" cy="6" r="3" fill="currentColor" opacity="0.5"/>
+        </svg>
+      )},
       { to: '/settings', label: 'Widget Config', icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path opacity="0.3" fillRule="evenodd" clipRule="evenodd" d="M12 2C10.8954 2 9.89541 2.6007 7.89541 3.80211L7.21541 4.20846C5.21541 5.40987 4.21541 6.01057 3.65541 7C3.09541 7.98943 3.09541 9.19084 3.09541 11.5937V12.4063C3.09541 14.8092 3.09541 16.0106 3.65541 17C4.21541 17.9894 5.21541 18.5901 7.21541 19.7915L7.89541 20.1979C9.89541 21.3993 10.8954 22 12 22C13.1046 22 14.1046 21.3993 16.1046 20.1979L16.7846 19.7915C18.7846 18.5901 19.7846 17.9894 20.3446 17C20.9046 16.0106 20.9046 14.8092 20.9046 12.4063V11.5937C20.9046 9.19084 20.9046 7.98943 20.3446 7C19.7846 6.01057 18.7846 5.40987 16.7846 4.20846L16.1046 3.80211C14.1046 2.6007 13.1046 2 12 2Z" fill="currentColor"/>
@@ -65,11 +73,12 @@ const menuItems = [
 ];
 
 export default function Sidebar({ collapsed, setCollapsed }) {
+  const { selectedBotId } = useBot();
   const [convCount, setConvCount] = useState(0);
 
   useEffect(() => {
-    getStats().then((res) => setConvCount(res.data.total_conversations)).catch(() => {});
-  }, []);
+    getStats(selectedBotId).then((res) => setConvCount(res.data.total_conversations)).catch(() => {});
+  }, [selectedBotId]);
 
   return (
     <nav className={`${collapsed ? 'w-[72px]' : 'w-[226px]'} fixed z-50 flex-none border-r-2 border-gray-100 dark:border-gray-800/50 transition-all duration-300 bg-white dark:bg-dark h-full`}>

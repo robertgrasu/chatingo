@@ -1,17 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../ThemeContext';
+import { useBot } from '../BotContext';
 
 export default function Topbar({ sidebarCollapsed }) {
   const { dark, toggle } = useTheme();
+  const { selectedBotId, selectBot, bots } = useBot();
   const [searchFocused, setSearchFocused] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [botDropOpen, setBotDropOpen] = useState(false);
   const profileRef = useRef(null);
+  const botDropRef = useRef(null);
+
+  const currentBot = bots.find((b) => b.bot_id === selectedBotId);
 
   useEffect(() => {
     const handler = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setProfileOpen(false);
-      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+      if (botDropRef.current && !botDropRef.current.contains(e.target)) setBotDropOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -36,6 +41,55 @@ export default function Topbar({ sidebarCollapsed }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {/* Bot Selector */}
+          <div ref={botDropRef} className="relative">
+            <button
+              onClick={() => setBotDropOpen(!botDropOpen)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-dark-lighter transition-colors duration-200"
+            >
+              <div className="w-4 h-4 rounded-md flex-shrink-0" style={{ backgroundColor: currentBot?.primary_color || '#6366f1' }} />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 max-w-[120px] truncate">
+                {currentBot?.bot_name || 'Select Bot'}
+              </span>
+              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${botDropOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {botDropOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 py-1.5 animate-scale-in max-h-72 overflow-y-auto">
+                <div className="px-3 py-1.5">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Botii Mei</p>
+                </div>
+                {bots.map((bot) => (
+                  <button
+                    key={bot.bot_id}
+                    onClick={() => { selectBot(bot.bot_id); setBotDropOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                      bot.bot_id === selectedBotId
+                        ? 'bg-primary/5 dark:bg-primary/10'
+                        : 'hover:bg-gray-50 dark:hover:bg-dark-lighter'
+                    }`}
+                  >
+                    <div className="w-5 h-5 rounded-md flex-shrink-0" style={{ backgroundColor: bot.primary_color || '#6366f1' }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{bot.bot_name}</p>
+                      <p className="text-[10px] text-gray-400">{bot.document_count} docs &middot; {bot.conversation_count} conv</p>
+                    </div>
+                    {bot.bot_id === selectedBotId && (
+                      <svg className="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+
           {/* Dark mode toggle */}
           <button
             onClick={toggle}
@@ -85,7 +139,6 @@ export default function Topbar({ sidebarCollapsed }) {
               </svg>
             </button>
 
-            {/* Dropdown */}
             {profileOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 py-1.5 animate-scale-in">
                 <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
