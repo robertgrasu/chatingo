@@ -1,3 +1,6 @@
+import io
+import os
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from threading import Thread
@@ -6,12 +9,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.models.database import (
+    AdminUser,
     BotConfig,
     Category,
     Conversation,
     ConversationFeedback,
     Document,
     Message,
+    Notification,
     SessionLocal,
     get_db,
 )
@@ -33,11 +38,17 @@ from app.models.schemas import (
     FeedbackListItem,
     FeedbackListResponse,
     MessageResponse,
+    NotificationItem,
+    NotificationListResponse,
+    NotificationMarkRead,
     StatsResponse,
     UploadResponse,
 )
+from app.services.auth import get_current_admin
 from app.services.embeddings import add_chunks, delete_bot_chunks, delete_document_chunks
 from app.utils.text_splitter import split_text
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
 
 router = APIRouter(prefix="/admin")
 
@@ -46,7 +57,7 @@ router = APIRouter(prefix="/admin")
 
 
 @router.get("/bots", response_model=BotListResponse)
-async def list_bots(db: Session = Depends(get_db)):
+async def list_bots(db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     bots = db.query(BotConfig).order_by(BotConfig.created_at.desc()).all()
     result = []
     for bot in bots:
@@ -66,7 +77,7 @@ async def list_bots(db: Session = Depends(get_db)):
 
 
 @router.post("/bots")
-async def create_bot(data: BotCreate, db: Session = Depends(get_db)):
+async def create_bot(data: BotCreate, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     bot_id = f"bot_{uuid.uuid4().hex[:8]}"
     config = BotConfig(
         bot_id=bot_id,
@@ -80,7 +91,7 @@ async def create_bot(data: BotCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/bots/{bot_id}")
-async def delete_bot(bot_id: str, db: Session = Depends(get_db)):
+async def delete_bot(bot_id: str, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
     if not config:
         raise HTTPException(status_code=404, detail="Bot not found")
@@ -90,6 +101,9 @@ async def delete_bot(bot_id: str, db: Session = Depends(get_db)):
         delete_bot_chunks(bot_id)
     except Exception:
         pass
+
+    # Delete notifications
+    db.query(Notification).filter(Notification.bot_id == bot_id).delete()
 
     # Delete feedback
     db.query(ConversationFeedback).filter(ConversationFeedback.bot_id == bot_id).delete()
@@ -118,7 +132,7 @@ async def delete_bot(bot_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/categories", response_model=list[CategoryResponse])
-async def list_categories(bot_id: str = "bot_123", db: Session = Depends(get_db)):
+async def list_categories(bot_id: str = "bot_123", db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     categories = db.query(Category).filter(Category.bot_id == bot_id).all()
     result = []
     for cat in categories:
@@ -130,7 +144,7 @@ async def list_categories(bot_id: str = "bot_123", db: Session = Depends(get_db)
 
 
 @router.post("/categories", response_model=CategoryResponse)
-async def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
+async def create_category(data: CategoryCreate, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     category = Category(name=data.name, bot_id=data.bot_id)
     db.add(category)
     db.commit()
@@ -140,7 +154,7 @@ async def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
 
 @router.put("/categories/{category_id}", response_model=CategoryResponse)
 async def update_category(
-    category_id: str, data: CategoryUpdate, db: Session = Depends(get_db)
+    category_id: str, data: CategoryUpdate, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin),
 ):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
@@ -157,7 +171,7 @@ async def update_category(
 
 
 @router.delete("/categories/{category_id}")
-async def delete_category(category_id: str, db: Session = Depends(get_db)):
+async def delete_category(category_id: str, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -182,7 +196,7 @@ async def delete_category(category_id: str, db: Session = Depends(get_db)):
 
 @router.get("/documents", response_model=list[DocumentResponse])
 async def list_documents(
-    category_id: str | None = None, bot_id: str | None = None, db: Session = Depends(get_db)
+    category_id: str | None = None, bot_id: str | None = None, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin),
 ):
     query = db.query(Document)
     if bot_id:
@@ -204,7 +218,7 @@ async def list_documents(
 
 
 @router.get("/documents/{document_id}", response_model=DocumentDetail)
-async def get_document(document_id: str, db: Session = Depends(get_db)):
+async def get_document(document_id: str, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -247,6 +261,7 @@ async def upload_document(
     category_id: str = Form(...),
     bot_id: str = Form("bot_123"),
     db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
 ):
     # Validate category exists
     category = db.query(Category).filter(Category.id == category_id).first()
@@ -254,19 +269,72 @@ async def upload_document(
         raise HTTPException(status_code=404, detail="Category not found")
 
     # Validate file type
-    if not file.filename.endswith(".txt"):
-        raise HTTPException(status_code=400, detail="Only TXT files are supported")
+    ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx"}
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename missing")
+    # Strip path components (prevent path traversal in filename)
+    clean_name = file.filename.split("/")[-1].split("\\")[-1]
+    # Get extension and validate
+    _, ext = os.path.splitext(clean_name)
+    ext = ext.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tip fisier nepermis. Acceptate: {', '.join(ALLOWED_EXTENSIONS)}",
+        )
+    # Reject double extensions (e.g. payload.php.txt)
+    name_without_ext = clean_name[: -len(ext)]
+    if "." in name_without_ext:
+        raise HTTPException(
+            status_code=400,
+            detail="Extensii duble nu sunt permise (ex: file.php.txt)",
+        )
 
-    # Read file content
+    # Read file content with size limit
     raw = await file.read()
-    text = raw.decode("utf-8")
+    if len(raw) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 10MB)")
+
+    # Extract text based on file type
+    if ext == ".txt":
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="Fisierul .txt trebuie sa fie UTF-8 valid")
+        if "\x00" in text:
+            raise HTTPException(status_code=400, detail="Fisierul contine continut binar")
+
+    elif ext == ".pdf":
+        try:
+            from PyPDF2 import PdfReader
+            reader = PdfReader(io.BytesIO(raw))
+            pages = [page.extract_text() or "" for page in reader.pages]
+            text = "\n\n".join(pages).strip()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Eroare la citirea PDF-ului: {str(e)}")
+
+    elif ext == ".docx":
+        try:
+            from docx import Document as DocxDocument
+            doc = DocxDocument(io.BytesIO(raw))
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            text = "\n\n".join(paragraphs).strip()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Eroare la citirea DOCX-ului: {str(e)}")
+
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="Nu s-a putut extrage text din fisier")
+
+    # Strip extension and sanitize for storage - extension is irrelevant after text extraction
+    name_base = os.path.splitext(clean_name)[0]
+    safe_filename = re.sub(r'[^\w\-\s]', '_', name_base).strip('_')[:200]
 
     # Create document record with content
     document_id = str(uuid.uuid4())
     document = Document(
         id=document_id,
         bot_id=bot_id,
-        filename=file.filename,
+        filename=safe_filename,
         category_id=category_id,
         content=text,
         status="processing",
@@ -274,10 +342,14 @@ async def upload_document(
     db.add(document)
     db.commit()
 
+    # Notification
+    create_notification(db, bot_id, "document", "Document nou incarcat", f'"{safe_filename}" a fost adaugat in Knowledge Base.', document_id)
+    db.commit()
+
     # Process in background thread
     thread = Thread(
         target=_process_document,
-        args=(document_id, text, category_id, file.filename, bot_id),
+        args=(document_id, text, category_id, safe_filename, bot_id),
     )
     thread.start()
 
@@ -285,7 +357,7 @@ async def upload_document(
 
 
 @router.post("/documents/text", response_model=UploadResponse)
-async def create_text_document(data: DocumentCreate, db: Session = Depends(get_db)):
+async def create_text_document(data: DocumentCreate, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     """Create a document from text input (no file upload)."""
     category = db.query(Category).filter(Category.id == data.category_id).first()
     if not category:
@@ -302,6 +374,9 @@ async def create_text_document(data: DocumentCreate, db: Session = Depends(get_d
         status="processing",
     )
     db.add(document)
+
+    # Notification
+    create_notification(db, bot_id, "document", "Document nou creat", f'"{data.title}" a fost adaugat in Knowledge Base.', document_id)
     db.commit()
 
     # Process in background thread
@@ -316,7 +391,7 @@ async def create_text_document(data: DocumentCreate, db: Session = Depends(get_d
 
 @router.put("/documents/{document_id}", response_model=DocumentDetail)
 async def update_document(
-    document_id: str, data: DocumentUpdate, db: Session = Depends(get_db)
+    document_id: str, data: DocumentUpdate, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin),
 ):
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
@@ -368,7 +443,7 @@ async def update_document(
 
 
 @router.delete("/documents/{document_id}")
-async def delete_document(document_id: str, db: Session = Depends(get_db)):
+async def delete_document(document_id: str, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -395,23 +470,27 @@ async def list_conversations(
     search: str = "",
     bot_id: str | None = None,
     db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
 ):
+    # Cap per_page to prevent DoS via memory exhaustion
+    per_page = max(1, min(per_page, 100))
+
     query = db.query(Conversation)
     if bot_id:
         query = query.filter(Conversation.bot_id == bot_id)
 
-    # Server-side search
+    # Server-side search (escape SQL wildcards to prevent wildcard injection)
     if search:
-        # Search in session_id or first user message
+        safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         matching_conv_ids = (
             db.query(Message.conversation_id)
-            .filter(Message.role == "user", Message.content.ilike(f"%{search}%"))
+            .filter(Message.role == "user", Message.content.ilike(f"%{safe_search}%", escape="\\"))
             .distinct()
             .all()
         )
         matching_ids = [r[0] for r in matching_conv_ids]
         query = query.filter(
-            (Conversation.session_id.ilike(f"%{search}%"))
+            (Conversation.session_id.ilike(f"%{safe_search}%", escape="\\"))
             | (Conversation.id.in_(matching_ids))
         )
 
@@ -459,7 +538,7 @@ async def list_conversations(
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
-async def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
+async def get_conversation(conversation_id: str, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -491,7 +570,7 @@ async def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/conversations/{conversation_id}")
-async def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
+async def delete_conversation(conversation_id: str, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -501,7 +580,7 @@ async def delete_conversation(conversation_id: str, db: Session = Depends(get_db
 
 
 @router.delete("/conversations")
-async def delete_all_conversations(bot_id: str | None = None, db: Session = Depends(get_db)):
+async def delete_all_conversations(bot_id: str | None = None, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     if bot_id:
         conv_ids = [c.id for c in db.query(Conversation).filter(Conversation.bot_id == bot_id).all()]
         count = len(conv_ids)
@@ -520,7 +599,7 @@ async def delete_all_conversations(bot_id: str | None = None, db: Session = Depe
 
 
 @router.get("/stats", response_model=StatsResponse)
-async def get_stats(bot_id: str | None = None, db: Session = Depends(get_db)):
+async def get_stats(bot_id: str | None = None, db: Session = Depends(get_db), admin: AdminUser = Depends(get_current_admin)):
     today_start = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
@@ -627,8 +706,12 @@ async def list_feedback(
     rating_filter: int | None = None,
     bot_id: str | None = None,
     db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
 ):
     from sqlalchemy import func as sqlfunc
+
+    # Cap per_page to prevent DoS via memory exhaustion
+    per_page = max(1, min(per_page, 100))
 
     query = db.query(ConversationFeedback)
     if bot_id:
@@ -718,3 +801,108 @@ async def list_feedback(
         total_ratings=all_total,
         rating_distribution=rating_distribution,
     )
+
+
+# --- Notifications ---
+
+
+def create_notification(db: Session, bot_id: str, notif_type: str, title: str, description: str = "", reference_id: str | None = None):
+    """Helper to create a notification record."""
+    notif = Notification(
+        bot_id=bot_id,
+        type=notif_type,
+        title=title,
+        description=description,
+        reference_id=reference_id,
+    )
+    db.add(notif)
+
+
+@router.get("/notifications", response_model=NotificationListResponse)
+async def list_notifications(
+    bot_id: str | None = None,
+    read: bool | None = None,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    query = db.query(Notification)
+    if bot_id:
+        query = query.filter(Notification.bot_id == bot_id)
+    if read is not None:
+        query = query.filter(Notification.read == read)
+
+    total = query.count()
+    unread_q = db.query(Notification).filter(Notification.read == False)
+    if bot_id:
+        unread_q = unread_q.filter(Notification.bot_id == bot_id)
+    unread_count = unread_q.count()
+
+    notifs = query.order_by(Notification.created_at.desc()).limit(50).all()
+
+    return NotificationListResponse(
+        items=[
+            NotificationItem(
+                id=n.id,
+                type=n.type,
+                title=n.title,
+                description=n.description or "",
+                read=n.read,
+                reference_id=n.reference_id,
+                created_at=n.created_at.isoformat(),
+            )
+            for n in notifs
+        ],
+        total=total,
+        unread_count=unread_count,
+    )
+
+
+@router.put("/notifications/read")
+async def mark_notifications_read(
+    data: NotificationMarkRead,
+    bot_id: str | None = None,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    if data.all:
+        query = db.query(Notification).filter(Notification.read == False)
+        if bot_id:
+            query = query.filter(Notification.bot_id == bot_id)
+        count = query.update({Notification.read: True})
+        db.commit()
+        return {"status": "ok", "count": count}
+    elif data.id:
+        notif = db.query(Notification).filter(Notification.id == data.id).first()
+        if notif:
+            notif.read = True
+            db.commit()
+        return {"status": "ok"}
+    raise HTTPException(status_code=400, detail="Provide id or all=true")
+
+
+@router.delete("/notifications/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    notif = db.query(Notification).filter(Notification.id == notification_id).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.delete(notif)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.delete("/notifications")
+async def delete_all_notifications(
+    bot_id: str | None = None,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    query = db.query(Notification)
+    if bot_id:
+        query = query.filter(Notification.bot_id == bot_id)
+    count = query.delete()
+    db.commit()
+    return {"status": "deleted", "count": count}
