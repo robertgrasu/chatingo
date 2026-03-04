@@ -5,15 +5,15 @@ from app.config import settings
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
-def get_chat_completion(system_prompt: str, user_message: str) -> str:
+def get_chat_completion(system_prompt: str, user_message: str, temperature: float = 0.7, max_tokens: int = 500) -> str:
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ],
-        temperature=0.7,
-        max_tokens=500,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
     return response.choices[0].message.content
 
