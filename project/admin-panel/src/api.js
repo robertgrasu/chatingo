@@ -4,6 +4,87 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const api = axios.create({ baseURL: `${API_URL}/api` });
 
+// Auth token management - set by AuthContext
+let _getAccessToken = () => null;
+let _refreshAccessToken = () => Promise.resolve(null);
+let _onAuthFailure = () => {};
+
+export function setAuthHelpers(getToken, refreshToken, onFailure) {
+  _getAccessToken = getToken;
+  _refreshAccessToken = refreshToken;
+  _onAuthFailure = onFailure;
+}
+
+// Request interceptor: inject Bearer token
+api.interceptors.request.use((config) => {
+  const token = _getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor: handle 401 with token refresh
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (token) => {
+  failedQueue.forEach(({ resolve, reject, config }) => {
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      resolve(api(config));
+    } else {
+      reject(new Error('Auth failed'));
+    }
+  });
+  failedQueue = [];
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If 401 and not already retried
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't retry auth endpoints
+      if (originalRequest.url?.includes('/auth/')) {
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject, config: originalRequest });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const newToken = await _refreshAccessToken();
+        isRefreshing = false;
+        if (newToken) {
+          processQueue(newToken);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return api(originalRequest);
+        } else {
+          processQueue(null);
+          _onAuthFailure();
+          return Promise.reject(error);
+        }
+      } catch {
+        isRefreshing = false;
+        processQueue(null);
+        _onAuthFailure();
+        return Promise.reject(error);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 // Bots
 export const getBots = () => api.get('/admin/bots');
 export const createBot = (data) => api.post('/admin/bots', data);
@@ -37,9 +118,9 @@ export const uploadDocument = (file, categoryId, botId) => {
 };
 export const deleteDocument = (id) => api.delete(`/admin/documents/${id}`);
 
-// Widget config
+// Widget config (admin: full config with AI params, requires auth)
 export const getWidgetConfig = (botId) =>
-  api.get(`/widget/config/${botId}`);
+  api.get(`/widget/config/${botId}/full`);
 export const updateWidgetConfig = (data, botId) =>
   api.put(`/widget/config/${botId}`, data);
 export const uploadAvatar = (file, botId) => {
@@ -67,5 +148,15 @@ export const getStats = (botId) =>
 // Feedback / Reviews
 export const getFeedback = (params = {}) =>
   api.get('/admin/feedback', { params });
+
+// Notifications
+export const getNotifications = (params = {}) =>
+  api.get('/admin/notifications', { params });
+export const markNotificationsRead = (data, botId) =>
+  api.put('/admin/notifications/read', data, { params: { bot_id: botId } });
+export const deleteNotification = (id) =>
+  api.delete(`/admin/notifications/${id}`);
+export const clearNotifications = (botId) =>
+  api.delete('/admin/notifications', { params: { bot_id: botId } });
 
 export default api;
