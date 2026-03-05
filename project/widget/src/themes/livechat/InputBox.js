@@ -38,6 +38,17 @@ export default function InputBox({
   const handleImageSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate file type (prevent non-image uploads)
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) { e.target.value = ''; return; }
+
+    // Reject double extensions (e.g. payload.exe.jpg)
+    if (file.name.split('.').length > 2) { e.target.value = ''; return; }
+
+    // Client-side size check (max 5MB)
+    if (file.size > 5 * 1024 * 1024) { e.target.value = ''; return; }
+
     const reader = new FileReader();
     reader.onload = (ev) => {
       setImage({ dataUrl: ev.target.result, name: file.name });

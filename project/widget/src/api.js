@@ -1,10 +1,12 @@
 const getConfig = () => window.chatbotConfig || {};
 
-// Generate a unique session ID per browser tab
+// Generate cryptographically secure session ID (128-bit entropy)
 let _sessionId = null;
 export function getSessionId() {
   if (!_sessionId) {
-    _sessionId = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    _sessionId = 'sess_' + Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
   }
   return _sessionId;
 }
