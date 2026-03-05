@@ -54,6 +54,13 @@ const menuItems = [
           <circle cx="18" cy="6" r="3" fill="currentColor" opacity="0.5"/>
         </svg>
       )},
+      { to: '/behavior', label: 'Comportament AI', icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path opacity="0.3" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor"/>
+          <path d="M12 6v2m0 8v2m-4-6H6m12 0h-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
+        </svg>
+      )},
       { to: '/settings', label: 'Widget Config', icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path opacity="0.3" fillRule="evenodd" clipRule="evenodd" d="M12 2C10.8954 2 9.89541 2.6007 7.89541 3.80211L7.21541 4.20846C5.21541 5.40987 4.21541 6.01057 3.65541 7C3.09541 7.98943 3.09541 9.19084 3.09541 11.5937V12.4063C3.09541 14.8092 3.09541 16.0106 3.65541 17C4.21541 17.9894 5.21541 18.5901 7.21541 19.7915L7.89541 20.1979C9.89541 21.3993 10.8954 22 12 22C13.1046 22 14.1046 21.3993 16.1046 20.1979L16.7846 19.7915C18.7846 18.5901 19.7846 17.9894 20.3446 17C20.9046 16.0106 20.9046 14.8092 20.9046 12.4063V11.5937C20.9046 9.19084 20.9046 7.98943 20.3446 7C19.7846 6.01057 18.7846 5.40987 16.7846 4.20846L16.1046 3.80211C14.1046 2.6007 13.1046 2 12 2Z" fill="currentColor"/>
