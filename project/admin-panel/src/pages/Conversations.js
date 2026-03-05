@@ -116,7 +116,6 @@ export default function Conversations() {
       <PageHeader
         title="Conversatii"
         subtitle={`${totalItems} conversatii in total`}
-        breadcrumbs={[{ label: 'Conversatii' }]}
         action={
           totalItems > 0 && (
             <button

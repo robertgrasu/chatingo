@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getFeedback, getConversation } from '../api';
+import { getFeedback, getConversation, getWidgetConfig, updateWidgetConfig } from '../api';
 import { useBot } from '../BotContext';
+import { useToast } from '../ToastContext';
 import PageHeader from '../components/PageHeader';
 import { MessageSkeleton } from '../components/Skeleton';
 import { timeAgo } from '../utils';
@@ -26,8 +27,10 @@ function Stars({ rating, size = 'w-3.5 h-3.5' }) {
 
 export default function Reviews() {
   const { selectedBotId } = useBot();
+  const { addToast } = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [enabled, setEnabled] = useState(true);
   const [page, setPage] = useState(1);
   const [perPage] = useState(15);
   const [sortBy, setSortBy] = useState('newest');
@@ -37,6 +40,24 @@ export default function Reviews() {
   const [selectedFb, setSelectedFb] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    getWidgetConfig(selectedBotId).then((res) => {
+      setEnabled(res.data.enable_reviews !== false);
+    }).catch(() => {});
+  }, [selectedBotId]);
+
+  const handleToggle = async () => {
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      await updateWidgetConfig({ enable_reviews: next }, selectedBotId);
+      addToast(next ? 'Recenzii activate' : 'Recenzii dezactivate', 'success');
+    } catch {
+      setEnabled(!next);
+      addToast('Eroare la salvare.', 'error');
+    }
+  };
 
   const loadFeedback = useCallback(() => {
     setLoading(true);
@@ -70,9 +91,19 @@ export default function Reviews() {
       <PageHeader
         title="Recenzii"
         subtitle="Feedback si evaluari de la utilizatori cu context conversational."
-        breadcrumbs={[{ label: 'Recenzii' }]}
+        action={
+          <button onClick={handleToggle} className="group inline-flex items-center gap-2.5 cursor-pointer select-none" title={enabled ? 'Dezactiveaza recenziile' : 'Activeaza recenziile'}>
+            <span className={`text-xs font-medium transition-colors ${enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'}`}>
+              {enabled ? 'Activ' : 'Inactiv'}
+            </span>
+            <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${enabled ? 'bg-emerald-500 group-hover:bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600 group-hover:bg-gray-400 dark:group-hover:bg-gray-500'}`}>
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+            </span>
+          </button>
+        }
       />
 
+      <div className={!enabled ? 'opacity-50 pointer-events-none select-none' : ''}>
       {loading && !data ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
           {[1, 2, 3].map((i) => (
@@ -366,6 +397,7 @@ export default function Reviews() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

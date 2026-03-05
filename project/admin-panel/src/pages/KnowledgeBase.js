@@ -15,15 +15,14 @@ import {
 } from '../api';
 import PageHeader from '../components/PageHeader';
 import ConfirmModal from '../components/ConfirmModal';
-import { TableRowSkeleton } from '../components/Skeleton';
 import { useToast } from '../ToastContext';
 import { useBot } from '../BotContext';
 import { formatDate } from '../utils';
 
 const statusConfig = {
-  ready: { label: 'Ready', color: 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  processing: { label: 'Processing', color: 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
-  error: { label: 'Error', color: 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400', dot: 'bg-red-500' },
+  ready: { label: 'Activ', color: 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  processing: { label: 'Se proceseaza', color: 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400', dot: 'bg-amber-500 animate-pulse' },
+  error: { label: 'Eroare', color: 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400', dot: 'bg-red-500' },
 };
 
 export default function KnowledgeBase() {
@@ -34,7 +33,7 @@ export default function KnowledgeBase() {
   const [documents, setDocuments] = useState([]);
   const [newCatName, setNewCatName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingDocs, setLoadingDocs] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Inline rename
   const [editingCatId, setEditingCatId] = useState(null);
@@ -77,7 +76,6 @@ export default function KnowledgeBase() {
   }, [selectedBotId]);
 
   const loadDocuments = useCallback(async (catId) => {
-    setLoadingDocs(true);
     try {
       if (catId === 'all') {
         const res = await getAllDocuments();
@@ -87,7 +85,7 @@ export default function KnowledgeBase() {
         setDocuments(res.data);
       }
     } finally {
-      setLoadingDocs(false);
+      setInitialLoading(false);
     }
   }, []);
 
@@ -133,8 +131,9 @@ export default function KnowledgeBase() {
 
   // --- Upload handler ---
   const handleFileSelect = (f) => {
-    if (f && !f.name.endsWith('.txt')) {
-      setError('Doar fisiere .txt sunt acceptate.');
+    const allowed = ['.txt', '.pdf', '.docx'];
+    if (f && !allowed.some(ext => f.name.toLowerCase().endsWith(ext))) {
+      setError('Doar fisiere .txt, .pdf si .docx sunt acceptate.');
       return;
     }
     setUploadFile(f);
@@ -254,7 +253,6 @@ export default function KnowledgeBase() {
       <PageHeader
         title="Knowledge Base"
         subtitle="Gestioneaza categoriile si documentele pentru chatbot."
-        breadcrumbs={[{ label: 'Knowledge Base' }]}
         action={
           <button
             onClick={() => { setShowAddPanel(!showAddPanel); setError(''); }}
@@ -327,11 +325,11 @@ export default function KnowledgeBase() {
                         : 'border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500'
                     }`}
                   >
-                    <input ref={fileInputRef} type="file" accept=".txt" onChange={(e) => handleFileSelect(e.target.files[0])} className="hidden" />
+                    <input ref={fileInputRef} type="file" accept=".txt,.pdf,.docx" onChange={(e) => handleFileSelect(e.target.files[0])} className="hidden" />
                     {uploadFile ? (
                       <span className="text-sm text-emerald-700 dark:text-emerald-400 truncate">{uploadFile.name}</span>
                     ) : (
-                      <span className="text-sm text-gray-400">Click sau drag & drop (.txt)</span>
+                      <span className="text-sm text-gray-400">Click sau drag & drop (.txt, .pdf, .docx)</span>
                     )}
                   </div>
                 </div>
@@ -404,8 +402,8 @@ export default function KnowledgeBase() {
         <div className="col-span-3">
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-5 sticky top-8">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Categorii</h3>
-              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">{categories.length}</span>
+              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Categorii</h3>
+              <span className="text-[11px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">{categories.length}</span>
             </div>
 
             <form onSubmit={handleCreateCategory} className="flex gap-2 mb-4">
@@ -425,11 +423,11 @@ export default function KnowledgeBase() {
               </button>
             </form>
 
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               <li
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm transition-all duration-200 ${
                   selectedCat === 'all'
-                    ? 'bg-primary/10 dark:bg-primary/10 text-primary shadow-sm'
+                    ? 'bg-primary/10 dark:bg-primary/10 text-primary'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 }`}
                 onClick={() => setSelectedCat('all')}
@@ -438,9 +436,9 @@ export default function KnowledgeBase() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
-                  <span className="font-medium">Toate documentele</span>
+                  <span className="font-medium">Toate</span>
                 </div>
-                <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md">{totalDocs}</span>
+                <span className="text-[11px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md tabular-nums">{totalDocs}</span>
               </li>
 
               {categories.map((cat) => (
@@ -448,7 +446,7 @@ export default function KnowledgeBase() {
                   key={cat.id}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm transition-all duration-200 group ${
                     selectedCat === cat.id
-                      ? 'bg-primary/10 dark:bg-primary/10 text-primary shadow-sm'
+                      ? 'bg-primary/10 dark:bg-primary/10 text-primary'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                   onClick={() => setSelectedCat(cat.id)}
@@ -475,10 +473,10 @@ export default function KnowledgeBase() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedCat === cat.id ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`} />
                       <span className="font-medium truncate">{cat.name}</span>
-                      <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md flex-shrink-0">{cat.document_count}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 ml-1">
+                  <span className="text-[11px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md tabular-nums flex-shrink-0 ml-auto group-hover:hidden">{cat.document_count}</span>
+                  <div className="hidden group-hover:flex items-center gap-0.5 flex-shrink-0 ml-auto">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -518,18 +516,17 @@ export default function KnowledgeBase() {
           </div>
         </div>
 
-        {/* Main - Documents Table */}
+        {/* Main - Documents */}
         <div className="col-span-9">
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
-            {/* Table header */}
+            {/* Header */}
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">
+                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
                   {selectedCat === 'all' ? 'Toate documentele' : getCategoryName(selectedCat)}
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">{filteredDocs.length} documente</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{filteredDocs.length} documente</p>
               </div>
-              {/* Search */}
               <div className="relative">
                 <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -538,84 +535,84 @@ export default function KnowledgeBase() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cauta documente..."
-                  className="pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all w-56"
+                  placeholder="Cauta..."
+                  className="pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all w-48"
                 />
               </div>
             </div>
 
-            {loadingDocs ? (
-              <div>
-                <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/80 dark:bg-gray-700/30 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <div className="col-span-4">Document</div>
-                  <div className="col-span-2">Categorie</div>
-                  <div className="col-span-2">Status</div>
-                  <div className="col-span-1 text-center">Chunks</div>
-                  <div className="col-span-2">Data</div>
-                  <div className="col-span-1 text-right">Actiuni</div>
-                </div>
-                <TableRowSkeleton />
-                <TableRowSkeleton />
-                <TableRowSkeleton />
+            {initialLoading ? (
+              <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-4 px-6 py-4">
+                    <div className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-lg animate-pulse" />
+                    <div className="flex-1">
+                      <div className="h-3.5 w-36 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-2.5 w-24 bg-gray-50 dark:bg-gray-700/50 rounded animate-pulse mt-2" />
+                    </div>
+                    <div className="h-6 w-16 bg-gray-100 dark:bg-gray-700 rounded-full animate-pulse" />
+                  </div>
+                ))}
               </div>
             ) : filteredDocs.length === 0 ? (
-              <div className="text-center py-16">
-                <svg className="w-16 h-16 text-gray-200 dark:text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-gray-400 text-sm">{searchQuery ? 'Niciun rezultat gasit.' : 'Niciun document.'}</p>
-                <p className="text-gray-300 dark:text-gray-500 text-xs mt-1">
+              <div className="text-center py-20">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">{searchQuery ? 'Niciun rezultat gasit' : 'Niciun document'}</p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                   {searchQuery ? 'Incearca un alt termen de cautare.' : 'Apasa "Adauga continut" pentru a incepe.'}
                 </p>
               </div>
             ) : (
-              <div>
-                {/* Column headers */}
-                <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/80 dark:bg-gray-700/30 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                  <div className="col-span-4">Document</div>
-                  <div className="col-span-2">Categorie</div>
-                  <div className="col-span-2">Status</div>
-                  <div className="col-span-1 text-center">Chunks</div>
-                  <div className="col-span-2">Data</div>
-                  <div className="col-span-1 text-right">Actiuni</div>
-                </div>
-
-                {/* Rows */}
+              <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
                 {filteredDocs.map((doc) => {
                   const status = statusConfig[doc.status] || statusConfig.error;
                   return (
                     <div
                       key={doc.id}
-                      className="grid grid-cols-12 gap-4 px-6 py-3.5 border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer items-center group"
+                      className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50/80 dark:hover:bg-gray-700/30 transition-colors cursor-pointer group"
                       onClick={() => handleOpenDocument(doc.id)}
                     >
-                      <div className="col-span-4 flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 bg-primary/10 dark:bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
+                      {/* Doc icon */}
+                      <div className="w-9 h-9 bg-primary/8 dark:bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4.5 h-4.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                      </div>
+
+                      {/* Title + category */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{doc.filename}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] text-gray-400">{getCategoryName(doc.category_id)}</span>
+                          <span className="text-gray-200 dark:text-gray-600 text-[11px]">&middot;</span>
+                          <span className="text-[11px] text-gray-400">{formatDate(doc.created_at)}</span>
+                          {doc.chunk_count > 0 && (
+                            <>
+                              <span className="text-gray-200 dark:text-gray-600 text-[11px]">&middot;</span>
+                              <span className="text-[11px] text-gray-400">{doc.chunk_count} fragmente</span>
+                            </>
+                          )}
                         </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{doc.filename}</span>
                       </div>
-                      <div className="col-span-2">
-                        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md">{getCategoryName(doc.category_id)}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${status.color}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                          {status.label}
-                        </span>
-                      </div>
-                      <div className="col-span-1 text-center">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">{doc.chunk_count || 0}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-sm text-gray-400">{formatDate(doc.created_at)}</span>
-                      </div>
-                      <div className="col-span-1 flex justify-end gap-1">
+
+                      {/* Status */}
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full flex-shrink-0 ml-auto group-hover:hidden ${status.color}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                        {status.label}
+                      </span>
+
+                      {/* Actions */}
+                      <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0 ml-auto">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleOpenDocument(doc.id); }}
-                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-primary transition-all p-1.5 rounded-lg hover:bg-primary/10 dark:hover:bg-primary/10"
+                          className="text-gray-400 hover:text-primary transition-all p-1.5 rounded-lg hover:bg-primary/10 dark:hover:bg-primary/10"
                           title="Editeaza"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -624,7 +621,7 @@ export default function KnowledgeBase() {
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }}
-                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10"
+                          className="text-gray-400 hover:text-red-500 transition-all p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10"
                           title="Sterge"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -661,24 +658,25 @@ export default function KnowledgeBase() {
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary/10 dark:bg-primary/10 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
                       </svg>
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">Editeaza document</h3>
+                      <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Editeaza document</h3>
                       <div className="flex items-center gap-3 mt-0.5">
                         {(() => {
                           const s = statusConfig[editDoc.status] || statusConfig.error;
                           return (
-                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${s.color}`}>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${s.color}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
                               {s.label}
                             </span>
                           );
                         })()}
-                        <span className="text-xs text-gray-400">{editDoc.chunk_count} chunks</span>
-                        <span className="text-xs text-gray-400">{formatDate(editDoc.created_at)}</span>
+                        <span className="text-[11px] text-gray-400">{editDoc.chunk_count} fragmente</span>
+                        <span className="text-[11px] text-gray-400">{formatDate(editDoc.created_at)}</span>
                       </div>
                     </div>
                   </div>
@@ -696,7 +694,7 @@ export default function KnowledgeBase() {
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Titlu / Nume fisier</label>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Titlu</label>
                       <input type="text" value={editFilename} onChange={(e) => setEditFilename(e.target.value)} className={inputClass} />
                     </div>
                     <div>
@@ -731,7 +729,7 @@ export default function KnowledgeBase() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
-                    Sterge document
+                    Sterge
                   </button>
                   <div className="flex items-center gap-3">
                     <button

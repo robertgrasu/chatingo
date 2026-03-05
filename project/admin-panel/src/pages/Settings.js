@@ -953,17 +953,46 @@ export default function Settings() {
       <PageHeader
         title="Settings"
         subtitle="Personalizeaza aspectul si comportamentul widget-ului."
-        breadcrumbs={[{ label: 'Settings' }]}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left: Accordions */}
         <div className="space-y-3">
           <Accordion
-            title="Bot Identity"
-
-            icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+            title="Tema Widget"
+            icon="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
             defaultOpen
+          >
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: 'default', label: 'Classic', desc: 'Designul original cu header colorat' },
+                { value: 'livechat', label: 'LiveChat', desc: 'Design modern cu Dynamic Island' },
+                { value: 'modern', label: 'Modern', desc: 'Glass design cu gradient si animatii' },
+              ].map((t) => (
+                <label
+                  key={t.value}
+                  className={`flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                    config.widget_theme === t.value
+                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <input type="radio" name="widget_theme" value={t.value} checked={config.widget_theme === t.value} onChange={(e) => setConfig({ ...config, widget_theme: e.target.value })} className="sr-only" />
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${config.widget_theme === t.value ? 'border-primary' : 'border-gray-300 dark:border-gray-500'}`}>
+                      {config.widget_theme === t.value && <div className="w-2 h-2 rounded-full bg-primary" />}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 ml-6">{t.desc}</p>
+                </label>
+              ))}
+            </div>
+          </Accordion>
+
+          <Accordion
+            title="Identitate Bot"
+            icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
           >
             <div className="space-y-4">
               <div>
@@ -974,14 +1003,83 @@ export default function Settings() {
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">Subtitlu</label>
                 <input type="text" value={config.bot_subtitle} onChange={(e) => setConfig({ ...config, bot_subtitle: e.target.value })} className={inputClass} placeholder="AI Agent" />
               </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">Mesaj de intampinare</label>
+                <textarea value={config.welcome_message} onChange={(e) => setConfig({ ...config, welcome_message: e.target.value })} rows={3} className={`${inputClass} resize-none`} placeholder="Scrie mesajul de bun venit..." />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">Text placeholder</label>
+                <input type="text" value={config.placeholder_text} onChange={(e) => setConfig({ ...config, placeholder_text: e.target.value })} className={inputClass} placeholder="Mesaj..." />
+              </div>
             </div>
           </Accordion>
 
-          <Accordion title="Welcome Message" icon="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
-            <textarea value={config.welcome_message} onChange={(e) => setConfig({ ...config, welcome_message: e.target.value })} rows={3} className={`${inputClass} resize-none`} placeholder="Scrie mesajul de bun venit..." />
+          <Accordion title="Avatar" icon="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z">
+            <div className="space-y-5">
+              {/* Avatar image upload */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Imagine avatar / logo</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 border-2 border-gray-200 dark:border-gray-600" style={{ background: config.avatar_url ? 'transparent' : config.avatar_color }}>
+                    {config.avatar_url ? (
+                      <img src={config.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input ref={avatarFileRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                    <button
+                      onClick={() => avatarFileRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      className="px-4 py-2 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                    >
+                      {uploadingAvatar ? 'Se incarca...' : 'Incarca imagine'}
+                    </button>
+                    {config.avatar_url && (
+                      <button
+                        onClick={handleAvatarDelete}
+                        className="px-4 py-2 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                      >
+                        Sterge imaginea
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2">PNG, JPG, GIF, WebP sau SVG. Se foloseste ca avatar in chat.</p>
+              </div>
+              {/* Fallback color */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare avatar (fallback)</label>
+                <ColorPicker
+                  value={config.avatar_color}
+                  onChange={(c) => setConfig({ ...config, avatar_color: c })}
+                  presets={avatarPresets}
+                />
+              </div>
+              {/* Avatar size slider */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Dimensiune avatar header</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={24}
+                    max={60}
+                    step={2}
+                    value={config.avatar_size || 42}
+                    onChange={(e) => setConfig({ ...config, avatar_size: parseInt(e.target.value) })}
+                    className="flex-1 accent-primary"
+                  />
+                  <span className="text-xs font-mono text-gray-500 dark:text-gray-400 w-10 text-right">{config.avatar_size || 42}px</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">Marimea avatarului din header-ul widget-ului (24-60px)</p>
+              </div>
+            </div>
           </Accordion>
 
-          <Accordion title="Accent & Gradient" icon="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01">
+          <Accordion title="Culoare accent" icon="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01">
             {/* Solid / Gradient toggle */}
             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5 mb-4">
               <button
@@ -1100,7 +1198,7 @@ export default function Settings() {
           </Accordion>
 
           {showHeaderColor && (
-            <Accordion title="Header Color" icon="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z">
+            <Accordion title="Culoare header" icon="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z">
               <ColorPicker
                 value={config.header_color}
                 onChange={(c) => setConfig({ ...config, header_color: c })}
@@ -1109,96 +1207,8 @@ export default function Settings() {
             </Accordion>
           )}
 
-          {showBubbleColors && (
-            <Accordion title="Chat Bubble" icon="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
-              <div className="space-y-5">
-                <div>
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare bubble</label>
-                  <ColorPicker
-                    value={config.bubble_color}
-                    onChange={(c) => setConfig({ ...config, bubble_color: c })}
-                    presets={bubblePresets}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare icon</label>
-                  <ColorPicker
-                    value={config.bubble_icon_color}
-                    onChange={(c) => setConfig({ ...config, bubble_icon_color: c })}
-                    presets={bubbleIconPresets}
-                  />
-                </div>
-              </div>
-            </Accordion>
-          )}
-
-          <Accordion title="Avatar Bot" icon="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z">
-            <div className="space-y-5">
-              {/* Avatar image upload */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Imagine avatar / logo</label>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 border-2 border-gray-200 dark:border-gray-600" style={{ background: config.avatar_url ? 'transparent' : config.avatar_color }}>
-                    {config.avatar_url ? (
-                      <img src={config.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <input ref={avatarFileRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-                    <button
-                      onClick={() => avatarFileRef.current?.click()}
-                      disabled={uploadingAvatar}
-                      className="px-4 py-2 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-                    >
-                      {uploadingAvatar ? 'Se incarca...' : 'Incarca imagine'}
-                    </button>
-                    {config.avatar_url && (
-                      <button
-                        onClick={handleAvatarDelete}
-                        className="px-4 py-2 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
-                      >
-                        Sterge imaginea
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-2">PNG, JPG, GIF, WebP sau SVG. Se foloseste ca avatar in chat.</p>
-              </div>
-              {/* Fallback color */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare avatar (fallback)</label>
-                <ColorPicker
-                  value={config.avatar_color}
-                  onChange={(c) => setConfig({ ...config, avatar_color: c })}
-                  presets={avatarPresets}
-                />
-              </div>
-              {/* Avatar size slider */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Dimensiune avatar header</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={24}
-                    max={60}
-                    step={2}
-                    value={config.avatar_size || 42}
-                    onChange={(e) => setConfig({ ...config, avatar_size: parseInt(e.target.value) })}
-                    className="flex-1 accent-primary"
-                  />
-                  <span className="text-xs font-mono text-gray-500 dark:text-gray-400 w-10 text-right">{config.avatar_size || 42}px</span>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-1">Marimea avatarului din header-ul widget-ului (24-60px)</p>
-              </div>
-            </div>
-          </Accordion>
-
           {showBotMsgColor && (
-            <Accordion title="Mesaje Bot" icon="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z">
+            <Accordion title="Culoare mesaje bot" icon="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z">
               <ColorPicker
                 value={config.bot_message_color}
                 onChange={(c) => setConfig({ ...config, bot_message_color: c })}
@@ -1207,128 +1217,7 @@ export default function Settings() {
             </Accordion>
           )}
 
-          <Accordion title="Placeholder Text" icon="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
-            <input type="text" value={config.placeholder_text} onChange={(e) => setConfig({ ...config, placeholder_text: e.target.value })} className={inputClass} placeholder="Mesaj..." />
-          </Accordion>
-
-          <Accordion title="Widget Theme" icon="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z">
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: 'default', label: 'Classic', desc: 'Designul original cu header colorat' },
-                { value: 'livechat', label: 'LiveChat', desc: 'Design modern cu Dynamic Island' },
-                { value: 'modern', label: 'Modern', desc: 'Glass design cu gradient si animatii' },
-              ].map((t) => (
-                <label
-                  key={t.value}
-                  className={`flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-                    config.widget_theme === t.value
-                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                  }`}
-                >
-                  <input type="radio" name="widget_theme" value={t.value} checked={config.widget_theme === t.value} onChange={(e) => setConfig({ ...config, widget_theme: e.target.value })} className="sr-only" />
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${config.widget_theme === t.value ? 'border-primary' : 'border-gray-300 dark:border-gray-500'}`}>
-                      {config.widget_theme === t.value && <div className="w-2 h-2 rounded-full bg-primary" />}
-                    </div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 ml-6">{t.desc}</p>
-                </label>
-              ))}
-            </div>
-          </Accordion>
-
-          <Accordion title="Functionalitati" icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
-            <div className="space-y-3">
-              {[
-                { key: 'enable_emoji', label: 'Emoji', desc: 'Afiseaza butonul de emoji si picker-ul' },
-                { key: 'enable_attachments', label: 'Atasari imagini', desc: 'Permite trimiterea de imagini' },
-                { key: 'enable_voice', label: 'Voice input', desc: 'Permite introducerea vocala' },
-                { key: 'show_online_status', label: 'Status online', desc: 'Afiseaza indicatorul verde de online' },
-                { key: 'show_subtitle', label: 'Subtitlu bot', desc: 'Afiseaza subtitlul sub numele botului' },
-              ].map((item) => (
-                <label key={item.key} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                  <div className="min-w-0 mr-3">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{item.label}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{item.desc}</div>
-                  </div>
-                  <div className="relative flex-shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={config[item.key] ?? true}
-                      onChange={(e) => setConfig({ ...config, [item.key]: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 rounded-full peer-checked:bg-primary transition-colors" />
-                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
-                  </div>
-                </label>
-              ))}
-            </div>
-          </Accordion>
-
-          <Accordion title="Iconita Bubble" icon="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 'chat', label: 'Chat', icon: (
-                  <svg width="20" height="20" viewBox="0 0 28 32" fill="currentColor">
-                    <path d="M28 12.8C28 5.732 21.732 0 14 0S0 5.732 0 12.8c0 5.396 3.592 10.024 8.68 11.88L14 32l5.32-7.32C24.408 22.824 28 18.196 28 12.8zM8 10.4a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2z"/>
-                  </svg>
-                )},
-                { value: 'message', label: 'Mesaj', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
-                  </svg>
-                )},
-                { value: 'support', label: 'Support', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 16.016c1.245-1.238 2-2.966 2-4.516a7.5 7.5 0 00-15 0c0 1.55.755 3.278 2 4.516"/><path d="M3.5 14v-2.5a8.5 8.5 0 0117 0V14"/><path d="M3.5 11.5a2 2 0 00-2 2v2a2 2 0 002 2h1a1 1 0 001-1v-4a1 1 0 00-1-1h-1z"/><path d="M20.5 11.5a2 2 0 012 2v2a2 2 0 01-2 2h-1a1 1 0 01-1-1v-4a1 1 0 011-1h1z"/>
-                  </svg>
-                )},
-                { value: 'bot', label: 'Bot', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                )},
-                { value: 'lightning', label: 'Energie', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor"/>
-                  </svg>
-                )},
-                { value: 'heart', label: 'Prietenos', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" fill="currentColor"/>
-                  </svg>
-                )},
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => setConfig({ ...config, bubble_icon: item.value })}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
-                    config.bubble_icon === item.value
-                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                  }`}
-                >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    config.bubble_icon === item.value
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                  }`}>
-                    {item.icon}
-                  </div>
-                  <span className={`text-xs font-medium ${
-                    config.bubble_icon === item.value
-                      ? 'text-primary'
-                      : 'text-gray-500 dark:text-gray-400'
-                  }`}>{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </Accordion>
-
-          <Accordion title="Culori Mesaje" icon="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z">
+          <Accordion title="Culori personalizate" icon="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z">
             <div className="space-y-5">
               <div>
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare buton Send</label>
@@ -1393,7 +1282,119 @@ export default function Settings() {
             </div>
           </Accordion>
 
-          <Accordion title="Widget Position" icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
+          {showBubbleColors && (
+            <Accordion title="Buton flotant" icon="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
+              <div className="space-y-5">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare bubble</label>
+                  <ColorPicker
+                    value={config.bubble_color}
+                    onChange={(c) => setConfig({ ...config, bubble_color: c })}
+                    presets={bubblePresets}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare icon</label>
+                  <ColorPicker
+                    value={config.bubble_icon_color}
+                    onChange={(c) => setConfig({ ...config, bubble_icon_color: c })}
+                    presets={bubbleIconPresets}
+                  />
+                </div>
+              </div>
+            </Accordion>
+          )}
+
+          <Accordion title="Iconita buton" icon="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'chat', label: 'Chat', icon: (
+                  <svg width="20" height="20" viewBox="0 0 28 32" fill="currentColor">
+                    <path d="M28 12.8C28 5.732 21.732 0 14 0S0 5.732 0 12.8c0 5.396 3.592 10.024 8.68 11.88L14 32l5.32-7.32C24.408 22.824 28 18.196 28 12.8zM8 10.4a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2z"/>
+                  </svg>
+                )},
+                { value: 'message', label: 'Mesaj', icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                  </svg>
+                )},
+                { value: 'support', label: 'Support', icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 16.016c1.245-1.238 2-2.966 2-4.516a7.5 7.5 0 00-15 0c0 1.55.755 3.278 2 4.516"/><path d="M3.5 14v-2.5a8.5 8.5 0 0117 0V14"/><path d="M3.5 11.5a2 2 0 00-2 2v2a2 2 0 002 2h1a1 1 0 001-1v-4a1 1 0 00-1-1h-1z"/><path d="M20.5 11.5a2 2 0 012 2v2a2 2 0 01-2 2h-1a1 1 0 01-1-1v-4a1 1 0 011-1h1z"/>
+                  </svg>
+                )},
+                { value: 'bot', label: 'Bot', icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                )},
+                { value: 'lightning', label: 'Energie', icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor"/>
+                  </svg>
+                )},
+                { value: 'heart', label: 'Prietenos', icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" fill="currentColor"/>
+                  </svg>
+                )},
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setConfig({ ...config, bubble_icon: item.value })}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
+                    config.bubble_icon === item.value
+                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    config.bubble_icon === item.value
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                  }`}>
+                    {item.icon}
+                  </div>
+                  <span className={`text-xs font-medium ${
+                    config.bubble_icon === item.value
+                      ? 'text-primary'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </Accordion>
+
+          <Accordion title="Functionalitati" icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+            <div className="space-y-3">
+              {[
+                { key: 'enable_emoji', label: 'Emoji', desc: 'Afiseaza butonul de emoji si picker-ul' },
+                { key: 'enable_attachments', label: 'Atasari imagini', desc: 'Permite trimiterea de imagini' },
+                { key: 'enable_voice', label: 'Voice input', desc: 'Permite introducerea vocala' },
+                { key: 'show_online_status', label: 'Status online', desc: 'Afiseaza indicatorul verde de online' },
+                { key: 'show_subtitle', label: 'Subtitlu bot', desc: 'Afiseaza subtitlul sub numele botului' },
+              ].map((item) => (
+                <label key={item.key} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <div className="min-w-0 mr-3">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{item.label}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{item.desc}</div>
+                  </div>
+                  <div className="relative flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={config[item.key] ?? true}
+                      onChange={(e) => setConfig({ ...config, [item.key]: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 rounded-full peer-checked:bg-primary transition-colors" />
+                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
+                  </div>
+                </label>
+              ))}
+            </div>
+          </Accordion>
+
+          <Accordion title="Pozitie widget" icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
             <div className="grid grid-cols-2 gap-3">
               {[
                 { value: 'bottom-right', label: 'Dreapta jos' },

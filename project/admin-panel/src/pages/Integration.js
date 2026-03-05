@@ -52,7 +52,6 @@ export default function Integration() {
       <PageHeader
         title="Integration"
         subtitle="Adauga chatbot-ul pe orice site web in 3 pasi simpli."
-        breadcrumbs={[{ label: 'Integration' }]}
       />
 
       {/* Steps */}

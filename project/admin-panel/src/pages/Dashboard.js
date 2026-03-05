@@ -25,13 +25,6 @@ export default function Dashboard() {
       <PageHeader
         title="Dashboard"
         subtitle="Privire de ansamblu asupra sistemului."
-        breadcrumbs={[{ label: 'Dashboard' }]}
-        action={
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-200 dark:border-emerald-500/20">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            Sistem Online
-          </span>
-        }
       />
 
       {/* Stats Cards */}
@@ -103,8 +96,8 @@ export default function Dashboard() {
       {/* Activity Chart + Recent Conversations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         {/* Activity Chart */}
-        <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
             <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Activitate ultimele 7 zile</h3>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
@@ -117,9 +110,9 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="p-5">
+          <div className="p-5 flex-1 flex flex-col min-h-0">
             {loading || !stats?.daily ? (
-              <div className="flex items-end gap-3 h-40">
+              <div className="flex items-end gap-3 flex-1 min-h-[10rem]">
                 {[40, 65, 30, 80, 55, 70, 45].map((h, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2">
                     <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-t animate-pulse" style={{ height: `${h}%` }} />
@@ -177,59 +170,68 @@ export default function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Actiuni rapide</h3>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4">
-          <ActionCard
-            onClick={() => navigate('/knowledge')}
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path opacity="0.3" d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" fill="currentColor"/>
-                <path d="M12 8v8m-4-4h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            }
-            label="Adauga document"
-            desc="Upload in knowledge base"
-            color="text-primary"
-          />
-          <ActionCard
-            onClick={() => navigate('/conversations')}
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path opacity="0.3" d="M18 14c0 4.418-3.582 8-8 8-1.236 0-2.406-.28-3.45-.78-.36-.172-.767-.232-1.151-.13l-1.227.328c-.966.259-1.85-.625-1.591-1.591l.328-1.227c.103-.384.042-.79-.13-1.15A7.96 7.96 0 012 14c0-4.418 3.582-8 8-8s8 3.582 8 8z" fill="currentColor"/>
-              </svg>
-            }
-            label="Conversatii"
-            desc="Vezi istoric chat"
-            color="text-purple"
-          />
-          <ActionCard
-            onClick={() => navigate('/settings')}
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path opacity="0.3" d="M12 2c-1.105 0-2.105.601-4.105 1.802L7.215 4.208c-2 1.201-3 1.802-3.56 2.792-.56.989-.56 2.19-.56 4.593v.814c0 2.403 0 3.604.56 4.593.56.99 1.56 1.591 3.56 2.792l.68.406c2 1.202 3 1.802 4.105 1.802 1.105 0 2.105-.6 4.105-1.802l.68-.406c2-1.201 3-1.802 3.56-2.792.56-.989.56-2.19.56-4.593v-.814c0-2.403 0-3.604-.56-4.593-.56-.99-1.56-1.591-3.56-2.792l-.68-.406C14.105 2.601 13.105 2 12 2z" fill="currentColor"/>
-                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-            }
-            label="Setari widget"
-            desc="Personalizeaza aspect"
-            color="text-gray-500"
-          />
-          <ActionCard
-            onClick={() => navigate('/integration')}
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path opacity="0.3" d="M3 10c0-3.771 0-5.657 1.172-6.828C5.343 2 7.229 2 11 2h2c3.771 0 5.657 0 6.828 1.172C21 4.343 21 6.229 21 10v4c0 3.771 0 5.657-1.172 6.828C18.657 22 16.771 22 13 22h-2c-3.771 0-5.657 0-6.828-1.172C3 19.657 3 17.771 3 14v-4z" fill="currentColor"/>
-                <path d="M8 12h8M8 8h8M8 16h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            }
-            label="Integrare"
-            desc="Cod embed pentru site"
-            color="text-success"
-          />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <button
+          onClick={() => navigate('/knowledge')}
+          className="group flex items-center gap-4 bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl px-5 py-4 text-left hover:border-primary/30 dark:hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+            <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M12 5v14m-7-7h14" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Adauga document</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Upload in knowledge base</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => navigate('/conversations')}
+          className="group flex items-center gap-4 bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl px-5 py-4 text-left hover:border-purple/30 dark:hover:border-purple/30 hover:shadow-lg hover:shadow-purple/5 transition-all duration-200"
+        >
+          <div className="w-10 h-10 rounded-xl bg-purple/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+            <svg className="w-5 h-5 text-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Conversatii</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Vezi istoric chat</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => navigate('/settings')}
+          className="group flex items-center gap-4 bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl px-5 py-4 text-left hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg hover:shadow-gray-500/5 transition-all duration-200"
+        >
+          <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Setari widget</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Personalizeaza aspect</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => navigate('/integration')}
+          className="group flex items-center gap-4 bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl px-5 py-4 text-left hover:border-emerald-300 dark:hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 transition-all duration-200"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+            <svg className="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Integrare</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Cod embed pentru site</p>
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -240,7 +242,7 @@ function ActivityChart({ daily }) {
   const dayNames = ['Dum', 'Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sam'];
 
   return (
-    <div className="flex items-end gap-2 h-36">
+    <div className="flex gap-2 flex-1 min-h-[9rem]">
       {daily.map((day, i) => {
         const msgH = maxVal > 0 ? (day.messages / maxVal) * 100 : 0;
         const convH = maxVal > 0 ? (day.conversations / maxVal) * 100 : 0;
@@ -257,7 +259,7 @@ function ActivityChart({ daily }) {
             </div>
 
             {/* Bars */}
-            <div className="w-full flex items-end justify-center gap-0.5 h-28">
+            <div className="w-full flex items-end justify-center gap-0.5 flex-1">
               <div
                 className={`w-[45%] rounded-t transition-all duration-500 ${isToday ? 'bg-primary' : 'bg-primary/40 dark:bg-primary/30'}`}
                 style={{ height: `${Math.max(msgH, 4)}%` }}
@@ -288,7 +290,7 @@ function StatCard({ label, value, sub, change, color, icon }) {
 
   return (
     <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl p-5 hover:-translate-y-0.5 transition-all duration-200">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[color]}`}>
           {icon}
@@ -311,19 +313,3 @@ function StatCard({ label, value, sub, change, color, icon }) {
   );
 }
 
-function ActionCard({ onClick, icon, label, desc, color }) {
-  return (
-    <button
-      onClick={onClick}
-      className="p-5 text-left hover:bg-gray-50 dark:hover:bg-dark-lighter transition-all group border-r border-b border-gray-100 dark:border-gray-800 last:border-r-0"
-    >
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${color} bg-current/10`}
-        style={{ backgroundColor: 'transparent' }}
-      >
-        <span className={color}>{icon}</span>
-      </div>
-      <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
-      <p className="text-[11px] text-gray-400 mt-0.5">{desc}</p>
-    </button>
-  );
-}
