@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.database import BotConfig, Conversation, ConversationFeedback, Message, Notification, get_db
 from app.models.schemas import ChatRequest, ChatResponse, FeedbackCreate
 from app.rate_limiter import limiter
+from app.services.domain_check import get_request_origin, is_origin_allowed
 from app.services.rag import generate_response
 
 router = APIRouter()
@@ -116,6 +117,12 @@ async def chat(request: Request, data: ChatRequest, db: Session = Depends(get_db
     bot = db.query(BotConfig).filter(BotConfig.bot_id == data.bot_id).first()
     if not bot:
         raise HTTPException(status_code=404, detail="Bot inexistent")
+
+    # Domain licensing check
+    if bot.allowed_domains:
+        origin = get_request_origin(request)
+        if not is_origin_allowed(bot.allowed_domains, origin):
+            raise HTTPException(status_code=403, detail="Widget neautorizat pe acest domeniu")
 
     # Find or create conversation
     conversation = None

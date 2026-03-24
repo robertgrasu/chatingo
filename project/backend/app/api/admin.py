@@ -803,6 +803,20 @@ async def list_feedback(
     )
 
 
+@router.delete("/feedback/{feedback_id}")
+async def delete_feedback(
+    feedback_id: str,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    fb = db.query(ConversationFeedback).filter(ConversationFeedback.id == feedback_id).first()
+    if not fb:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    db.delete(fb)
+    db.commit()
+    return {"status": "deleted"}
+
+
 # --- Notifications ---
 
 

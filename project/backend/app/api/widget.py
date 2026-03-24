@@ -12,6 +12,7 @@ from app.models.database import AdminUser, BotConfig, get_db
 from app.models.schemas import WidgetConfigPublic, WidgetConfigResponse, WidgetConfigUpdate
 from app.rate_limiter import limiter
 from app.services.auth import get_current_admin
+from app.services.domain_check import get_request_origin, is_origin_allowed
 
 router = APIRouter(prefix="/widget")
 
@@ -47,6 +48,7 @@ def _config_to_public(config: BotConfig) -> WidgetConfigPublic:
         enable_voice=config.enable_voice if config.enable_voice is not None else False,
         enable_reviews=config.enable_reviews if config.enable_reviews is not None else True,
         enable_quick_replies=config.enable_quick_replies if config.enable_quick_replies is not None else True,
+        enable_live_chat=config.enable_live_chat if config.enable_live_chat is not None else False,
         send_button_color=config.send_button_color,
         user_message_color=config.user_message_color,
         bubble_icon=config.bubble_icon or "chat",
@@ -54,6 +56,18 @@ def _config_to_public(config: BotConfig) -> WidgetConfigPublic:
         quick_replies=config.quick_replies,
         language=config.language or "auto",
     )
+
+
+def _parse_allowed_domains(config: BotConfig) -> list[str]:
+    """Parse allowed_domains JSON from DB to list."""
+    if not config.allowed_domains:
+        return []
+    try:
+        import json
+        domains = json.loads(config.allowed_domains)
+        return domains if isinstance(domains, list) else []
+    except (json.JSONDecodeError, TypeError):
+        return []
 
 
 def _config_to_full(config: BotConfig) -> WidgetConfigResponse:
@@ -66,6 +80,7 @@ def _config_to_full(config: BotConfig) -> WidgetConfigResponse:
         max_tokens=config.max_tokens if config.max_tokens is not None else 500,
         response_style=config.response_style or "balanced",
         context_docs_count=config.context_docs_count if config.context_docs_count is not None else 3,
+        allowed_domains=_parse_allowed_domains(config),
     )
 
 
@@ -82,36 +97,21 @@ def _safe_delete_file(filepath: str):
 @limiter.limit("60/minute")
 async def get_widget_config(request: Request, bot_id: str, db: Session = Depends(get_db)):
     config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
+
+    # Domain licensing check
+    if config and config.allowed_domains:
+        origin = get_request_origin(request)
+        if not is_origin_allowed(config.allowed_domains, origin):
+            raise HTTPException(
+                status_code=403,
+                detail="Widget neautorizat pe acest domeniu",
+            )
+
     if not config:
-        return WidgetConfigPublic(
-            welcome_message="Bună! Cu ce te pot ajuta?",
-            bot_name="AI Assistant",
-            bot_subtitle="AI Agent",
-            primary_color="#6366f1",
-            header_color="#14161a",
-            bubble_color="#ffffff",
-            bubble_icon_color="#14161a",
-            bot_message_color="#f5f5f5",
-            avatar_color="#6366f1",
-            avatar_url=None,
-            gradient_end_color=None,
-            gradient_angle=135,
-            placeholder_text="Mesaj...",
-            position="bottom-right",
-            widget_theme="default",
-            show_online_status=True,
-            show_subtitle=True,
-            enable_emoji=True,
-            enable_attachments=True,
-            enable_voice=False,
-            enable_reviews=True,
-            enable_quick_replies=True,
-            send_button_color=None,
-            user_message_color=None,
-            bubble_icon="chat",
-            avatar_size=42,
-            quick_replies=None,
-            language="auto",
+        # No config = no bot = no allowed domains → 403
+        raise HTTPException(
+            status_code=403,
+            detail="Bot inexistent sau niciun domeniu configurat",
         )
     return _config_to_public(config)
 
@@ -183,6 +183,8 @@ async def update_widget_config(
         config.enable_reviews = data.enable_reviews
     if data.enable_quick_replies is not None:
         config.enable_quick_replies = data.enable_quick_replies
+    if data.enable_live_chat is not None:
+        config.enable_live_chat = data.enable_live_chat
     if data.send_button_color is not None:
         config.send_button_color = data.send_button_color if data.send_button_color != "" else None
     if data.user_message_color is not None:
@@ -206,6 +208,9 @@ async def update_widget_config(
         config.context_docs_count = data.context_docs_count
     if data.language is not None:
         config.language = data.language
+    if data.allowed_domains is not None:
+        import json
+        config.allowed_domains = json.dumps(data.allowed_domains)
 
     db.commit()
     db.refresh(config)
