@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
-from app.api import admin, auth, chat, widget
+from app.api import admin, auth, chat, livechat, widget, ws_operator, ws_visitor
 from app.config import settings
 from app.models.database import init_db
 from app.rate_limiter import limiter
@@ -48,6 +48,9 @@ app.include_router(auth.router, prefix="/api", tags=["Auth"])
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
 app.include_router(widget.router, prefix="/api", tags=["Widget"])
+app.include_router(livechat.router, prefix="/api", tags=["LiveChat"])
+app.include_router(ws_visitor.router, tags=["WebSocket"])
+app.include_router(ws_operator.router, tags=["WebSocket"])
 
 # Serve static files (compiled widget)
 static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
