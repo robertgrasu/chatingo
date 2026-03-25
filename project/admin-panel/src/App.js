@@ -19,6 +19,8 @@ import Bots from './pages/Bots';
 import AccountSettings from './pages/AccountSettings';
 import Notifications from './pages/Notifications';
 import BotBehavior from './pages/BotBehavior';
+import LiveChat from './pages/LiveChat';
+import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 
 function ProtectedRoute({ children }) {
@@ -65,11 +67,13 @@ function AppLayout() {
                 <Route path="/bots" element={<Bots />} />
                 <Route path="/knowledge" element={<KnowledgeBase />} />
                 <Route path="/conversations" element={<Conversations />} />
+                <Route path="/live-chat" element={<LiveChat />} />
                 <Route path="/quick-replies" element={<QuickReplies />} />
                 <Route path="/reviews" element={<Reviews />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/behavior" element={<BotBehavior />} />
                 <Route path="/integration" element={<Integration />} />
+                <Route path="/users" element={<UserManagement />} />
                 <Route path="/account" element={<AccountSettings />} />
                 <Route path="/notifications" element={<Notifications />} />
               </Routes>

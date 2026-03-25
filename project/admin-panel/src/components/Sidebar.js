@@ -3,84 +3,124 @@ import { NavLink } from 'react-router-dom';
 import { getStats } from '../api';
 import { useBot } from '../BotContext';
 
+
+const DuoIcon = ({ children }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">{children}</svg>
+);
+
+const icons = {
+  dashboard: (
+    <DuoIcon>
+      <g opacity="0.4"><rect x="13" y="11" width="7" height="9" rx="2" ry="2"/><rect x="4" y="4" width="7" height="9" rx="2" ry="2"/></g>
+      <g><rect x="4" y="15" width="7" height="5" rx="2" ry="2"/><rect x="13" y="4" width="7" height="5" rx="2" ry="2"/></g>
+    </DuoIcon>
+  ),
+  bookContent: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="m17.5,4h-5.5v16h5.5c1.93,0,3.5-1.57,3.5-3.5V7.5c0-1.93-1.57-3.5-3.5-3.5Zm1,8h-4c-.28,0-.5-.22-.5-.5s.22-.5.5-.5h4c.28,0,.5.22.5.5s-.22.5-.5.5Zm0-4h-4c-.28,0-.5-.22-.5-.5s.22-.5.5-.5h4c.28,0,.5.22.5.5s-.22.5-.5.5Z"/></g>
+      <g><path d="m12,4h-5.5c-1.93,0-3.5,1.57-3.5,3.5v9c0,1.93,1.57,3.5,3.5,3.5h5.5V4Z"/></g>
+    </DuoIcon>
+  ),
+  bolt: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="m14.36,4.61c0-.69-.42-1.29-1.07-1.52-.65-.23-1.35-.03-1.79.51l-6.52,8.15c-.39.49-.46,1.14-.19,1.7.27.56.82.91,1.45.91h3.4l4.72-4.72v-5.03Z"/></g>
+      <g><path d="m17.76,9.64h-3.4l-4.72,4.72v5.03c0,.69.42,1.29,1.07,1.52.18.06.36.09.54.09.47,0,.93-.21,1.24-.6l6.52-8.15c.39-.49.46-1.14.19-1.7-.27-.56-.82-.91-1.45-.91Z"/></g>
+    </DuoIcon>
+  ),
+  star: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="M12 2l2.94 5.96 6.58.58c.49.04.9.36 1.07.82s.06.96-.29 1.31l-5.01 5.01 1.25 4.06c.16.51-.02 1.05-.45 1.37s-1 .33-1.44-.04L12 17.77V2Z"/></g>
+      <g><path d="M12 2L9.06 7.96l-6.58.58c-.49.04-.9.36-1.07.82s-.06.96.29 1.31l5.01 5.01-1.25 4.06c-.16.51.02 1.05.45 1.37s1 .33 1.44-.04L12 17.77V2Z"/></g>
+    </DuoIcon>
+  ),
+  chat: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="M17.98 14.51C18.09 14.46 18.2 14.42 18.3 14.37c.29-.14.63-.19.93-.1l1 .27c.79.21 1.5-.5 1.29-1.29l-.27-1c-.08-.31-.03-.65.14-.93C21.77 10.45 22 9.5 22 8.5 22 4.91 19.09 2 15.5 2c-2.71 0-5.03 1.66-6.01 4.02.17-.01.34-.02.51-.02 4.42 0 8 3.58 8 8 0 .17 0 .34-.02.51Z"/></g>
+      <g><path d="M18 14c0 4.42-3.58 8-8 8-1.24 0-2.41-.28-3.45-.78-.36-.17-.77-.23-1.16-.13l-1.23.33c-.97.26-1.85-.66-1.58-1.59l.33-1.23c.1-.39.04-.79-.13-1.16C2.28 16.41 2 15.24 2 14c0-4.42 3.58-8 8-8s8 3.58 8 8Z"/></g>
+    </DuoIcon>
+  ),
+  liveChat: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="M12 2C7.58 2 4 5.58 4 10v4c0 1.1-.9 2-2 2v2c2.21 0 4-1.79 4-4v-4c0-3.31 2.69-6 6-6s6 2.69 6 6v4c0 2.21 1.79 4 4 4v-2c-1.1 0-2-.9-2-2v-4c0-4.42-3.58-8-8-8z"/></g>
+      <g><rect x="5" y="12" width="4" height="6" rx="2"/><rect x="15" y="12" width="4" height="6" rx="2"/></g>
+    </DuoIcon>
+  ),
+  bot: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="M12 2a1 1 0 0 1 1 1v1h-2V3a1 1 0 0 1 1-1ZM3 11a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0v-2a1 1 0 0 1 1-1Zm18 0a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0v-2a1 1 0 0 1 1-1Z"/></g>
+      <g><rect x="5" y="5" width="14" height="13" rx="3" ry="3"/><circle cx="9.5" cy="10.5" r="1.5" fill="white"/><circle cx="14.5" cy="10.5" r="1.5" fill="white"/><path d="M9 14.5c0-.28.22-.5.5-.5h5c.28 0 .5.22.5.5s-.22.5-.5.5h-5c-.28 0-.5-.22-.5-.5Z" fill="white"/></g>
+    </DuoIcon>
+  ),
+  brain: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="m10.11,3c-1.13,0-2.09.8-2.33,1.89h-.03c-1.58,0-2.86,1.28-2.86,2.86,0,.4.08.79.24,1.14-1.25.49-2.13,1.72-2.13,3.11,0,.99.43,1.91,1.18,2.55-.15.39-.23.81-.23,1.23,0,1.71,1.3,3.12,3,3.31.4,1.13,1.48,1.91,2.7,1.91.98,0,1.85-.49,2.36-1.25V3.93c-.44-.56-1.12-.93-1.89-.93Z"/></g>
+      <g><path d="m18.87,8.89c.16-.36.24-.75.24-1.14,0-1.59-1.34-2.9-2.89-2.86-.23-1.08-1.19-1.89-2.34-1.89-.77,0-1.45.36-1.89.93v15.83c.52.75,1.38,1.25,2.36,1.25,1.22,0,2.3-.78,2.7-1.91,1.68-.17,3-1.59,3-3.32,0-.42-.08-.84-.23-1.23.74-.63,1.18-1.56,1.18-2.55,0-1.39-.88-2.62-2.13-3.11Z"/></g>
+    </DuoIcon>
+  ),
+  palette: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="m13.26,3.09c-2.83-.39-5.62.54-7.63,2.55-2.01,2.01-2.94,4.79-2.55,7.63.48,3.5,3.11,6.48,6.56,7.42.78.21,1.57.32,2.36.32.04,0,.08,0,.12,0,.82-.01,1.57-.44,2-1.14.43-.7.48-1.55.12-2.29l-.19-.39c-.53-1.1-.11-2.09.45-2.66.57-.57,1.56-.98,2.66-.45l.39.19c.74.36,1.59.31,2.29-.12s1.12-1.18,1.14-2c.01-.83-.09-1.66-.32-2.48-.93-3.45-3.92-6.08-7.42-6.56Z"/></g>
+      <g><circle cx="7.4" cy="10.05" r="1.12"/><circle cx="10.2" cy="7.31" r="1.25"/><circle cx="7.33" cy="13.76" r="1"/><circle cx="14.27" cy="7.55" r="1.38"/></g>
+    </DuoIcon>
+  ),
+  codeAlt: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="m7.9,16.1c.1.1.23.15.35.15s.26-.05.35-.15c.2-.2.2-.51,0-.71l-3.4-3.4,3.4-3.4c.2-.2.2-.51,0-.71s-.51-.2-.71,0l-3.75,3.75c-.2.2-.2.51,0,.71l3.75,3.75Z"/><path d="m15.4,7.9c-.2.2-.2.51,0,.71l3.4,3.4-3.4,3.4c-.2.2-.2.51,0,.71.1.1.23.15.35.15s.26-.05.35-.15l3.75-3.75c.2-.2.2-.51,0-.71l-3.75-3.75c-.2-.2-.51-.2-.71,0Z"/></g>
+      <g><path d="m10,19.98s.08.02.12.02c.22,0,.43-.15.49-.38l3.75-15c.07-.27-.1-.54-.36-.61-.27-.07-.54.1-.61.36l-3.75,15c-.07.27.1.54.36.61Z"/></g>
+    </DuoIcon>
+  ),
+  users: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></g>
+      <g><circle cx="12" cy="7" r="4"/></g>
+    </DuoIcon>
+  ),
+  account: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="M12 14c-3.31 0-6 2.69-6 6v1h12v-1c0-3.31-2.69-6-6-6Z"/></g>
+      <g><circle cx="12" cy="8" r="4"/></g>
+    </DuoIcon>
+  ),
+  logout: (
+    <DuoIcon>
+      <g opacity="0.4"><path d="M5 5h6V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h6v-2H5V5Z"/></g>
+      <g><path d="m20.5,12.5l-4,4v-3h-6v-2h6v-3l4,4Z"/></g>
+    </DuoIcon>
+  ),
+};
+
 const menuItems = [
   {
-    section: 'Main',
+    section: 'General',
     items: [
-      { to: '/', label: 'Dashboard', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" d="M10.8939 22H13.1061C16.5526 22 18.2759 22 19.451 20.9882C20.626 19.9764 20.8697 18.2827 21.3572 14.8952L21.6359 12.9579C22.0154 10.3208 22.2051 9.00229 21.6646 7.87495C21.1242 6.7476 19.9738 6.06234 17.6731 4.69182L16.2882 3.86687C14.199 2.62229 13.1543 2 12 2C10.8457 2 9.80104 2.62229 7.71175 3.86687L6.32691 4.69181C4.02619 6.06234 2.87583 6.7476 2.33537 7.87495C1.79491 9.00229 1.98463 10.3208 2.36407 12.9579L2.64284 14.8952C3.13025 18.2827 3.37396 19.9764 4.54903 20.9882C5.72409 22 7.44737 22 10.8939 22Z" fill="currentColor"/>
-          <path d="M9.44666 15.397C9.11389 15.1504 8.64418 15.2202 8.39752 15.5529C8.15086 15.8857 8.22067 16.3554 8.55343 16.6021C9.52585 17.3229 10.7151 17.7496 12 17.7496C13.285 17.7496 14.4742 17.3229 15.4467 16.6021C15.7794 16.3554 15.8492 15.8857 15.6026 15.5529C15.3559 15.2202 14.8862 15.1504 14.5534 15.397C13.8251 15.9369 12.9459 16.2496 12 16.2496C11.0541 16.2496 10.175 15.9369 9.44666 15.397Z" fill="currentColor"/>
-        </svg>
-      )},
-      { to: '/knowledge', label: 'Knowledge Base', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" d="M21 18C21 18.5967 20.7629 19.169 20.341 19.591C19.919 20.0129 19.3467 20.25 18.75 20.25H8.25C8.84674 20.25 9.41903 20.0129 9.84099 19.591C10.2629 19.169 10.5 18.5967 10.5 18C10.5 17.0625 9.75 16.5 9.75 16.5H20.25C20.25 16.5 21 17.0625 21 18Z" fill="currentColor"/>
-          <path d="M16.5 9.75C16.5 9.55109 16.421 9.36032 16.2803 9.21967C16.1397 9.07902 15.9489 9 15.75 9H9.75C9.55109 9 9.36032 9.07902 9.21967 9.21967C9.07902 9.36032 9 9.55109 9 9.75C9 9.94891 9.07902 10.1397 9.21967 10.2803C9.36032 10.421 9.55109 10.5 9.75 10.5H15.75C15.9489 10.5 16.1397 10.421 16.2803 10.2803C16.421 10.1397 16.5 9.94891 16.5 9.75ZM15.75 12H9.75C9.55109 12 9.36032 12.079 9.21967 12.2197C9.07902 12.3603 9 12.5511 9 12.75C9 12.9489 9.07902 13.1397 9.21967 13.2803C9.36032 13.421 9.55109 13.5 9.75 13.5H15.75C15.9489 13.5 16.1397 13.421 16.2803 13.2803C16.421 13.1397 16.5 12.9489 16.5 12.75C16.5 12.5511 16.421 12.3603 16.2803 12.2197C16.1397 12.079 15.9489 12 15.75 12Z" fill="currentColor"/>
-        </svg>
-      )},
+      { to: '/', label: 'Dashboard', icon: icons.dashboard },
+      { to: '/knowledge', label: 'Knowledge Base', icon: icons.bookContent },
+      { to: '/quick-replies', label: 'Raspunsuri Rapide', icon: icons.bolt },
     ],
   },
   {
-    section: 'Apps',
+    section: 'Comunicare',
     items: [
-      { to: '/quick-replies', label: 'Raspunsuri Rapide', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" d="M2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C22 4.92893 22 7.28595 22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12Z" fill="currentColor"/>
-          <path d="M13 6.75L7 12H10.25V17.25L16.25 12H13V6.75Z" fill="currentColor"/>
-        </svg>
-      )},
-      { to: '/reviews', label: 'Recenzii', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor"/>
-          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" opacity="0.6"/>
-        </svg>
-      )},
-      { to: '/conversations', label: 'Conversatii', badge: true, icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path fillRule="evenodd" clipRule="evenodd" d="M18 14C18 18.4183 14.4183 22 10 22C8.76449 22 7.5944 21.7199 6.54976 21.2198C6.19071 21.0479 5.78393 20.9876 5.39939 21.0904L4.17335 21.4185C3.20701 21.677 2.32295 20.793 2.58151 19.8267L2.90955 18.6006C3.01245 18.2161 2.95209 17.8093 2.7802 17.4502C2.28008 16.4056 2 15.2355 2 14C2 9.58172 5.58172 6 10 6C14.4183 6 18 9.58172 18 14Z" fill="currentColor"/>
-          <path opacity="0.3" d="M17.9841 14.5084C18.092 14.4638 18.1985 14.4163 18.3033 14.3661C18.5951 14.2264 18.9256 14.1774 19.238 14.261L20.2342 14.5275C21.0193 14.7376 21.7376 14.0193 21.5275 13.2342L21.261 12.238C21.1774 11.9256 21.2264 11.595 21.3661 11.3033C21.7725 10.4545 22 9.50385 22 8.5C22 4.91015 19.0899 2 15.5 2C12.79 2 10.4673 3.6585 9.49158 6.0159C9.6597 6.00535 9.82924 6 10 6C14.4183 6 18 9.58172 18 14C18 14.1708 17.9947 14.3403 17.9841 14.5084Z" fill="currentColor"/>
-        </svg>
-      )},
+      { to: '/conversations', label: 'Conversatii', badge: true, icon: icons.chat },
+      { to: '/live-chat', label: 'Live Chat', icon: icons.liveChat },
+      { to: '/reviews', label: 'Recenzii', icon: icons.star },
     ],
   },
   {
-    section: 'Settings',
+    section: 'Configurare',
     items: [
-      { to: '/bots', label: 'Botii Mei', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" d="M15.5 7.5C15.5 9.433 13.933 11 12 11C10.067 11 8.5 9.433 8.5 7.5C8.5 5.567 10.067 4 12 4C13.933 4 15.5 5.567 15.5 7.5Z" fill="currentColor"/>
-          <path d="M19.5 20.5C19.5 16.358 16.142 13 12 13C7.858 13 4.5 16.358 4.5 20.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="18" cy="6" r="3" fill="currentColor" opacity="0.5"/>
-        </svg>
-      )},
-      { to: '/behavior', label: 'Comportament AI', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor"/>
-          <path d="M12 6v2m0 8v2m-4-6H6m12 0h-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      )},
-      { to: '/settings', label: 'Widget Config', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" fillRule="evenodd" clipRule="evenodd" d="M12 2C10.8954 2 9.89541 2.6007 7.89541 3.80211L7.21541 4.20846C5.21541 5.40987 4.21541 6.01057 3.65541 7C3.09541 7.98943 3.09541 9.19084 3.09541 11.5937V12.4063C3.09541 14.8092 3.09541 16.0106 3.65541 17C4.21541 17.9894 5.21541 18.5901 7.21541 19.7915L7.89541 20.1979C9.89541 21.3993 10.8954 22 12 22C13.1046 22 14.1046 21.3993 16.1046 20.1979L16.7846 19.7915C18.7846 18.5901 19.7846 17.9894 20.3446 17C20.9046 16.0106 20.9046 14.8092 20.9046 12.4063V11.5937C20.9046 9.19084 20.9046 7.98943 20.3446 7C19.7846 6.01057 18.7846 5.40987 16.7846 4.20846L16.1046 3.80211C14.1046 2.6007 13.1046 2 12 2Z" fill="currentColor"/>
-          <path d="M12 8.25C9.92893 8.25 8.25 9.92893 8.25 12C8.25 14.0711 9.92893 15.75 12 15.75C14.0711 15.75 15.75 14.0711 15.75 12C15.75 9.92893 14.0711 8.25 12 8.25Z" fill="currentColor"/>
-        </svg>
-      )},
-      { to: '/integration', label: 'Integration', icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path opacity="0.3" d="M3 10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H13C16.7712 2 18.6569 2 19.8284 3.17157C21 4.34315 21 6.22876 21 10V14C21 17.7712 21 19.6569 19.8284 20.8284C18.6569 22 16.7712 22 13 22H11C7.22876 22 5.34315 22 4.17157 20.8284C3 19.6569 3 17.7712 3 14V10Z" fill="currentColor"/>
-          <path fillRule="evenodd" clipRule="evenodd" d="M7.25 12C7.25 11.5858 7.58579 11.25 8 11.25H16C16.4142 11.25 16.75 11.5858 16.75 12C16.75 12.4142 16.4142 12.75 16 12.75H8C7.58579 12.75 7.25 12.4142 7.25 12Z" fill="currentColor"/>
-          <path fillRule="evenodd" clipRule="evenodd" d="M7.25 8C7.25 7.58579 7.58579 7.25 8 7.25H16C16.4142 7.25 16.75 7.58579 16.75 8C16.75 8.41421 16.4142 8.75 16 8.75H8C7.58579 8.75 7.25 8.41421 7.25 8Z" fill="currentColor"/>
-          <path fillRule="evenodd" clipRule="evenodd" d="M7.25 16C7.25 15.5858 7.58579 15.25 8 15.25H13C13.4142 15.25 13.75 15.5858 13.75 16C13.75 16.4142 13.4142 16.75 13 16.75H8C7.58579 16.75 7.25 16.4142 7.25 16Z" fill="currentColor"/>
-        </svg>
-      )},
+      { to: '/bots', label: 'Botii Mei', icon: icons.bot },
+      { to: '/behavior', label: 'Comportament AI', icon: icons.brain },
+      { to: '/settings', label: 'Widget Config', icon: icons.palette },
+      { to: '/integration', label: 'Integration', icon: icons.codeAlt },
+      { to: '/users', label: 'Utilizatori', icon: icons.users },
     ],
   },
 ];
 
 export default function Sidebar({ collapsed, setCollapsed }) {
   const { selectedBotId } = useBot();
+
   const [convCount, setConvCount] = useState(0);
 
   useEffect(() => {
@@ -88,24 +128,32 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   }, [selectedBotId]);
 
   return (
-    <nav className={`${collapsed ? 'w-[72px]' : 'w-[226px]'} fixed z-50 flex-none border-r-2 border-gray-100 dark:border-gray-800/50 transition-all duration-300 bg-white dark:bg-dark h-full`}>
+    <nav className={`${collapsed ? 'w-[72px]' : 'w-[226px]'} fixed z-50 flex-none border-r border-gray-200/80 dark:border-gray-800/60 transition-all duration-300 bg-white dark:bg-dark h-full`}>
       <div className="h-full flex flex-col">
+
         {/* Logo */}
-        <div className="p-3.5">
+        <div className="px-3.5 pt-4 pb-2">
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2.5 px-1'}`}>
-            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            <div className="w-9 h-9 bg-gradient-to-br from-primary to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path opacity="0.35" d="M16 14c0 3.87-3.13 7-7 7-1.08 0-2.11-.25-3.02-.68L2 21.5l1.18-3.98A6.95 6.95 0 0 1 2 14c0-3.87 3.13-7 7-7s7 3.13 7 7Z"/>
+                <path d="M17 3l1.2 2.8L21 7l-2.8 1.2L17 11l-1.2-2.8L13 7l2.8-1.2L17 3Z"/>
+                <path d="M21 12l.7 1.6 1.8.7-1.8.7-.7 1.6-.7-1.6-1.8-.7 1.8-.7.7-1.6Z" opacity="0.6"/>
               </svg>
             </div>
-            {!collapsed && <span className="text-base font-bold text-gray-900 dark:text-white">ChatBot</span>}
+            {!collapsed && (
+              <div className="min-w-0">
+                <span className="text-[15px] font-bold text-gray-900 dark:text-white tracking-tight">AiChat</span>
+                <span className="text-[10px] text-gray-400 font-medium ml-1.5">Pro</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Toggle line */}
-        <div className="flex items-center gap-2.5 py-2.5 pe-2.5">
-          <div className="h-[2px] bg-gray-100 dark:bg-gray-800 flex-1" />
-          <button onClick={() => setCollapsed(!collapsed)} className="shrink-0 text-gray-400 hover:text-primary duration-300">
+        {/* Collapse toggle */}
+        <div className="flex items-center gap-2.5 py-2 pe-3">
+          <div className="h-px bg-gray-100 dark:bg-gray-800/60 flex-1" />
+          <button onClick={() => setCollapsed(!collapsed)} className="shrink-0 text-gray-300 dark:text-gray-600 hover:text-primary duration-200">
             <svg className={`w-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} viewBox="0 0 13 12" fill="none">
               <path opacity="0.2" d="M5.46133 6.00002L11.1623 12L12.4613 10.633L8.05922 6.00002L12.4613 1.36702L11.1623 0L5.46133 6.00002Z" fill="currentColor"/>
               <path d="M0 6.00002L5.70101 12L7 10.633L2.59782 6.00002L7 1.36702L5.70101 0L0 6.00002Z" fill="currentColor"/>
@@ -113,13 +161,14 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           </button>
         </div>
 
-        {/* Menu */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-1 pb-4 space-y-4">
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 pt-0.5 pb-4 space-y-5">
           {menuItems.map((group) => (
             <div key={group.section}>
               {!collapsed && (
-                <h2 className="pt-2 pb-2 text-gray-400 text-[11px] font-semibold uppercase tracking-wider px-2">{group.section}</h2>
+                <h2 className="pt-1 pb-1.5 text-gray-400 dark:text-gray-500 text-[10px] font-semibold uppercase tracking-widest px-2.5">{group.section}</h2>
               )}
+              {collapsed && <div className="h-px bg-gray-100 dark:bg-gray-800/40 mx-2 mb-2" />}
               <div className="flex flex-col gap-0.5">
                 {group.items.map((link) => (
                   <NavLink
@@ -127,15 +176,15 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                     to={link.to}
                     end={link.to === '/'}
                     className={({ isActive }) =>
-                      `nav-link group flex items-center ${collapsed ? 'justify-center' : 'gap-2.5 px-2.5'} py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                      `group flex items-center ${collapsed ? 'justify-center' : 'gap-2.5 px-2.5'} py-[7px] rounded-lg text-[13px] font-medium transition-all duration-150 ${
                         isActive
-                          ? 'bg-primary/10 text-primary'
-                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-dark-lighter hover:text-gray-900 dark:hover:text-white'
+                          ? 'bg-primary/[0.08] text-primary dark:bg-primary/10'
+                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/40 hover:text-gray-800 dark:hover:text-gray-200'
                       }`
                     }
                     title={collapsed ? link.label : undefined}
                   >
-                    <span className="flex-shrink-0">{link.icon}</span>
+                    <span className="flex-shrink-0 transition-colors duration-150">{link.icon}</span>
                     {!collapsed && (
                       <>
                         <span className="flex-1 truncate">{link.label}</span>
@@ -153,12 +202,6 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           ))}
         </div>
 
-        {/* Version footer */}
-        {!collapsed && (
-          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800/50">
-            <p className="text-[10px] text-gray-400">ChatBot Admin v1.0</p>
-          </div>
-        )}
       </div>
     </nav>
   );
