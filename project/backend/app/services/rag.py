@@ -66,6 +66,25 @@ def _build_system_prompt(config, context=None):
     return prompt
 
 
+CANT_HELP_PHRASES = [
+    "nu am informații", "nu am informatii",
+    "nu dețin informații", "nu detin informatii",
+    "nu am date", "nu pot ajuta",
+    "nu am găsit", "nu am gasit",
+    "nu știu", "nu stiu",
+    "nu dispun de informații", "nu dispun de informatii",
+    "baza de cunoștințe", "baza de cunostinte",
+    "nu am în baza", "nu am in baza",
+    "reformula", "nu pot răspunde", "nu pot raspunde",
+]
+
+
+def _bot_cant_help(response: str) -> bool:
+    """Check if the bot's response indicates it can't help."""
+    lower = response.lower()
+    return any(phrase in lower for phrase in CANT_HELP_PHRASES)
+
+
 def generate_response(user_message: str, bot_id: str = None, db: Session = None) -> dict:
     """Search knowledge base and generate a response using per-bot config."""
     config = None
@@ -84,9 +103,14 @@ def generate_response(user_message: str, bot_id: str = None, db: Session = None)
         return {
             "response": response_text,
             "sources": [],
+            "confidence": 0.0,
+            "needs_escalation": _bot_cant_help(response_text),
         }
 
-    # Build context from matches
+    # Confidence = average similarity of top matches
+    confidence = round(sum(m["similarity"] for m in matches) / len(matches), 3)
+
+    # Build context from all matches
     context_parts = []
     sources = []
     for match in matches:
@@ -103,4 +127,6 @@ def generate_response(user_message: str, bot_id: str = None, db: Session = None)
     return {
         "response": response_text,
         "sources": sources,
+        "confidence": confidence,
+        "needs_escalation": _bot_cant_help(response_text),
     }

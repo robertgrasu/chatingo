@@ -91,7 +91,7 @@ def search_similar(query: str, top_k: int = 3, bot_id: str = None) -> list[dict]
         distance = results["distances"][0][i]
         # Cosine distance: 0 = identical, 2 = opposite. Convert to similarity.
         similarity = 1 - distance
-        if similarity >= 0.2:
+        if similarity >= 0.35:
             matches.append(
                 {
                     "text": results["documents"][0][i],
