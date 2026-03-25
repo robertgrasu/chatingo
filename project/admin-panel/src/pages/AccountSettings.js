@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../ToastContext';
-import { useTheme } from '../ThemeContext';
 import { useAuth } from '../AuthContext';
+import { updateProfile } from '../api';
 
 function Section({ title, subtitle, icon, children }) {
   return (
@@ -43,26 +43,32 @@ function InputField({ label, value, onChange, type = 'text', placeholder, disabl
 
 export default function AccountSettings() {
   const { addToast } = useToast();
-  const { dark } = useTheme();
   const { user, changePassword } = useAuth();
   const navigate = useNavigate();
-  const fileRef = useRef(null);
 
-  // Profile from auth context (backend), not localStorage
-  const profile = {
-    name: user?.username || 'Admin',
-    email: user?.email || '',
-    role: user?.role || 'admin',
-    avatar: null,
-  };
-
+  const [profileName, setProfileName] = useState(user?.username || '');
+  const [profileEmail, setProfileEmail] = useState(user?.email || '');
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
-  const [notifications, setNotifications] = useState({ email: true, browser: false, newConversation: true, feedback: true });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
-  const [saving, setSaving] = useState(false);
-
-  const saveProfile = () => {
-    addToast('Profilul se gestioneaza prin backend.', 'info');
+  const saveProfile = async () => {
+    if (!profileName.trim()) {
+      addToast('Username-ul nu poate fi gol.', 'error');
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await updateProfile({
+        username: profileName.trim(),
+        email: profileEmail.trim() || null,
+      });
+      addToast('Profil actualizat!', 'success');
+    } catch (err) {
+      addToast(err.response?.data?.detail || 'Eroare la salvare.', 'error');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const savePassword = async () => {
@@ -78,7 +84,7 @@ export default function AccountSettings() {
       addToast('Parolele nu coincid.', 'error');
       return;
     }
-    setSaving(true);
+    setSavingPassword(true);
     try {
       await changePassword(passwords.current, passwords.newPass);
       addToast('Parola schimbata! Te rugam sa te autentifici din nou.', 'success');
@@ -86,20 +92,9 @@ export default function AccountSettings() {
     } catch (err) {
       addToast(err.response?.data?.detail || 'Eroare la schimbarea parolei.', 'error');
     } finally {
-      setSaving(false);
+      setSavingPassword(false);
     }
   };
-
-  const saveNotifications = () => {
-    addToast('Preferintele de notificari au fost salvate!', 'success');
-  };
-
-  const handleAvatarUpload = (e) => {
-    // Avatar upload is a cosmetic feature - no localStorage storage
-    addToast('Avatar upload disponibil in versiunea urmatoare.', 'info');
-  };
-
-  const removeAvatar = () => {};
 
   return (
     <div className="animate-page-enter">
@@ -111,9 +106,7 @@ export default function AccountSettings() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Profile Card */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Profile Card */}
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
-            {/* Banner */}
             <div className="h-24 bg-gradient-to-br from-primary via-primary-600 to-indigo-700 relative">
               <div className="absolute inset-0 opacity-20">
                 <svg className="w-full h-full" viewBox="0 0 400 100" preserveAspectRatio="none">
@@ -122,52 +115,23 @@ export default function AccountSettings() {
                 </svg>
               </div>
             </div>
-
-            {/* Avatar + Info */}
             <div className="px-5 pb-5 -mt-10 relative">
-              <div className="relative inline-block">
-                <div
-                  onClick={() => fileRef.current?.click()}
-                  className="w-20 h-20 rounded-xl border-4 border-white dark:border-dark-light bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white text-2xl font-bold cursor-pointer hover:opacity-90 transition-opacity overflow-hidden shadow-lg"
-                >
-                  {profile.avatar ? (
-                    <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    profile.name?.charAt(0).toUpperCase() || 'A'
-                  )}
-                </div>
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-700 rounded-lg flex items-center justify-center text-gray-500 hover:text-primary transition-colors shadow-sm"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-                <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+              <div className="w-20 h-20 rounded-xl border-4 border-white dark:border-dark-light bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                {(user?.username || 'A').charAt(0).toUpperCase()}
               </div>
-
-              {profile.avatar && (
-                <button onClick={removeAvatar} className="ml-3 text-xs text-red-500 hover:text-red-600 transition-colors">
-                  Sterge poza
-                </button>
-              )}
-
               <div className="mt-3">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{profile.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{profile.email}</p>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{user?.username || 'Admin'}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email || 'Fara email'}</p>
                 <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  {profile.role}
+                  {user?.role || 'admin'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Quick Stats */}
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-5">
             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Activitate</h4>
             <div className="space-y-3">
@@ -175,17 +139,6 @@ export default function AccountSettings() {
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg flex items-center justify-center">
                     <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Ultima autentificare</span>
-                </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">Acum</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 bg-blue-50 dark:bg-blue-500/10 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
@@ -198,14 +151,14 @@ export default function AccountSettings() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 bg-purple-50 dark:bg-purple-500/10 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <div className="w-8 h-8 bg-blue-50 dark:bg-blue-500/10 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Cont creat</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Rol</span>
                 </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">Feb 2026</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">{user?.role || 'admin'}</span>
               </div>
             </div>
           </div>
@@ -213,7 +166,6 @@ export default function AccountSettings() {
 
         {/* Right Column - Settings Forms */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Profile Info */}
           <Section
             title="Informatii Profil"
             subtitle="Actualizeaza datele tale personale"
@@ -221,24 +173,24 @@ export default function AccountSettings() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <InputField
-                label="Nume Complet"
-                value={profile.name}
-                onChange={(v) => setProfile((p) => ({ ...p, name: v }))}
-                placeholder="Numele tau"
+                label="Username"
+                value={profileName}
+                onChange={setProfileName}
+                placeholder="Username-ul tau"
               />
               <InputField
                 label="Email"
                 type="email"
-                value={profile.email}
-                onChange={(v) => setProfile((p) => ({ ...p, email: v }))}
+                value={profileEmail}
+                onChange={setProfileEmail}
                 placeholder="email@exemplu.com"
               />
               <InputField
                 label="Rol"
-                value={profile.role}
-                onChange={(v) => setProfile((p) => ({ ...p, role: v }))}
+                value={user?.role || 'admin'}
+                onChange={() => {}}
                 disabled
-                helper="Rolul poate fi schimbat doar de un super-admin."
+                helper="Rolul poate fi schimbat doar din pagina Utilizatori."
               />
               <InputField
                 label="Limba"
@@ -251,10 +203,10 @@ export default function AccountSettings() {
             <div className="flex justify-end mt-5">
               <button
                 onClick={saveProfile}
-                disabled={saving}
+                disabled={savingProfile}
                 className="px-5 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {saving && (
+                {savingProfile && (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -265,7 +217,6 @@ export default function AccountSettings() {
             </div>
           </Section>
 
-          {/* Security */}
           <Section
             title="Securitate"
             subtitle="Schimba-ti parola de acces"
@@ -307,10 +258,10 @@ export default function AccountSettings() {
             <div className="flex justify-end mt-5">
               <button
                 onClick={savePassword}
-                disabled={saving}
+                disabled={savingPassword}
                 className="px-5 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {saving && (
+                {savingPassword && (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -320,50 +271,6 @@ export default function AccountSettings() {
               </button>
             </div>
           </Section>
-
-          {/* Notifications */}
-          <Section
-            title="Notificari"
-            subtitle="Alege ce notificari doresti sa primesti"
-            icon="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          >
-            <div className="space-y-4">
-              {[
-                { key: 'email', label: 'Notificari Email', desc: 'Primeste rezumate prin email' },
-                { key: 'browser', label: 'Notificari Browser', desc: 'Notificari push in browser' },
-                { key: 'newConversation', label: 'Conversatie Noua', desc: 'Cand un vizitator initiaza o conversatie' },
-                { key: 'feedback', label: 'Feedback Primit', desc: 'Cand un vizitator lasa o recenzie' },
-              ].map((item) => (
-                <div key={item.key} className="flex items-center justify-between py-1">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{item.label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{item.desc}</p>
-                  </div>
-                  <button
-                    onClick={() => setNotifications((n) => ({ ...n, [item.key]: !n[item.key] }))}
-                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                      notifications[item.key] ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
-                        notifications[item.key] ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end mt-5">
-              <button
-                onClick={saveNotifications}
-                className="px-5 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-              >
-                Salveaza Notificari
-              </button>
-            </div>
-          </Section>
-
         </div>
       </div>
     </div>
