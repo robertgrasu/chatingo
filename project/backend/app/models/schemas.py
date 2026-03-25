@@ -30,6 +30,39 @@ class UserResponse(BaseModel):
     role: str
 
 
+class UserDetailResponse(BaseModel):
+    id: str
+    username: str
+    email: str | None = None
+    role: str
+    is_active: bool
+    created_at: str
+    last_login: str | None = None
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=50)
+    password: str = Field(..., min_length=6, max_length=128)
+    email: str | None = Field(None, max_length=200)
+    role: str = Field("admin", max_length=20)
+
+
+class UserUpdateRequest(BaseModel):
+    username: str | None = Field(None, min_length=2, max_length=50)
+    email: str | None = Field(None, max_length=200)
+    role: str | None = Field(None, max_length=20)
+    is_active: bool | None = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    username: str | None = Field(None, min_length=2, max_length=50)
+    email: str | None = Field(None, max_length=200)
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
 # ── Chat Schemas ──────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
@@ -50,6 +83,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     image_url: str | None = None
+    sender_type: str | None = None
     created_at: str
 
 
@@ -252,6 +286,7 @@ class WidgetConfigPublic(BaseModel):
     enable_voice: bool = False
     enable_reviews: bool = True
     enable_quick_replies: bool = True
+    enable_live_chat: bool = False
     send_button_color: str | None = None
     user_message_color: str | None = None
     bubble_icon: str = "chat"
@@ -267,6 +302,7 @@ class WidgetConfigResponse(WidgetConfigPublic):
     max_tokens: int = 500
     response_style: str = "balanced"
     context_docs_count: int = 3
+    allowed_domains: list[str] = []
 
 
 class WidgetConfigUpdate(BaseModel):
@@ -292,6 +328,7 @@ class WidgetConfigUpdate(BaseModel):
     enable_voice: bool | None = None
     enable_reviews: bool | None = None
     enable_quick_replies: bool | None = None
+    enable_live_chat: bool | None = None
     send_button_color: str | None = Field(default=None, max_length=30)
     user_message_color: str | None = Field(default=None, max_length=30)
     bubble_icon: str | None = Field(default=None, max_length=20)
@@ -304,3 +341,23 @@ class WidgetConfigUpdate(BaseModel):
     response_style: str | None = Field(default=None, max_length=20)
     context_docs_count: int | None = Field(default=None, ge=1, le=10)
     language: str | None = Field(default=None, max_length=10)
+    allowed_domains: list[str] | None = None
+
+
+# ── Contact Submission Schemas ───────────────────────────────
+
+class ContactSubmissionOut(BaseModel):
+    id: str
+    bot_id: str
+    session_id: str
+    visitor_name: str
+    visitor_email: str
+    message: str
+    status: str
+    created_at: str
+    conversation_id: str | None = None
+
+
+class ContactSubmissionListResponse(BaseModel):
+    items: list[ContactSubmissionOut]
+    total: int

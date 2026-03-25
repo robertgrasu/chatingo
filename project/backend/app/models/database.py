@@ -92,6 +92,8 @@ class BotConfig(Base):
     response_style = Column(String(20), default="balanced")
     context_docs_count = Column(Integer, default=3)
     language = Column(String(10), default="auto")
+    enable_live_chat = Column(Boolean, default=False)
+    allowed_domains = Column(Text, nullable=True)  # JSON array: '["example.com","*.example.com"]'
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -110,6 +112,8 @@ class Conversation(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
     message_count = Column(Integer, default=0)
+    status = Column(String(20), default="bot")  # bot, waiting, live, closed
+    operator_id = Column(String, ForeignKey("admin_users.id"), nullable=True)
 
     messages = relationship(
         "Message", back_populates="conversation", cascade="all, delete-orphan",
@@ -127,6 +131,7 @@ class Message(Base):
     role = Column(String(20), nullable=False)  # user, assistant
     content = Column(Text, nullable=False)
     image_url = Column(Text, nullable=True)
+    sender_type = Column(String(20), nullable=True)  # bot, operator, system, user (NULL=legacy)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -179,6 +184,35 @@ class AdminUser(Base):
     last_login = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     refresh_token = Column(String(255), nullable=True)
+
+
+class ContactSubmission(Base):
+    __tablename__ = "contact_submissions"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    bot_id = Column(String(100), nullable=False, index=True)
+    conversation_id = Column(
+        String, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )
+    session_id = Column(String(100), nullable=False)
+    visitor_name = Column(String(200), nullable=False)
+    visitor_email = Column(String(300), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), default="new")  # new, read, replied
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+
+class OperatorStatus(Base):
+    __tablename__ = "operator_status"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    admin_user_id = Column(
+        String, ForeignKey("admin_users.id"), unique=True, nullable=False
+    )
+    is_available = Column(Boolean, default=False)
+    last_seen_at = Column(DateTime, nullable=True)
 
 
 engine = create_engine(settings.DATABASE_URL)
@@ -274,6 +308,23 @@ def init_db():
             ))
             conn.execute(text(
                 "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'auto'"
+            ))
+            # Live chat columns
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS enable_live_chat BOOLEAN DEFAULT FALSE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'bot'"
+            ))
+            conn.execute(text(
+                "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS operator_id VARCHAR"
+            ))
+            conn.execute(text(
+                "ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_type VARCHAR(20)"
+            ))
+            # Domain licensing
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS allowed_domains TEXT"
             ))
             conn.commit()
         except Exception:
