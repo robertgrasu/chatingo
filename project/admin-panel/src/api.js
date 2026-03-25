@@ -149,6 +149,9 @@ export const getStats = (botId) =>
 export const getFeedback = (params = {}) =>
   api.get('/admin/feedback', { params });
 
+export const deleteFeedback = (id) =>
+  api.delete(`/admin/feedback/${id}`);
+
 // Notifications
 export const getNotifications = (params = {}) =>
   api.get('/admin/notifications', { params });
@@ -159,4 +162,50 @@ export const deleteNotification = (id) =>
 export const clearNotifications = (botId) =>
   api.delete('/admin/notifications', { params: { bot_id: botId } });
 
+// Live Chat
+export const getLiveChatConversations = () =>
+  api.get('/admin/livechat/conversations');
+export const getLiveChatMessages = (conversationId) =>
+  api.get(`/admin/livechat/conversations/${conversationId}/messages`);
+export const getOperatorStatus = () =>
+  api.get('/admin/livechat/operator/status');
+export const updateOperatorStatus = (isAvailable) =>
+  api.put('/admin/livechat/operator/status', { is_available: isAvailable });
+export const getContactSubmissions = () =>
+  api.get('/admin/livechat/contacts');
+export const markContactRead = (id) =>
+  api.put(`/admin/livechat/contacts/${id}/read`);
+export const deleteContact = (id) =>
+  api.delete(`/admin/livechat/contacts/${id}`);
+
+// User Management
+export const getUsers = () => api.get('/auth/users');
+export const createUser = (data) => api.post('/auth/users', data);
+export const updateUser = (id, data) => api.put(`/auth/users/${id}`, data);
+export const deleteUser = (id) => api.delete(`/auth/users/${id}`);
+export const resetUserPassword = (id, newPassword) =>
+  api.put(`/auth/users/${id}/reset-password`, { new_password: newPassword });
+
+// Profile
+export const updateProfile = (data) => api.put('/auth/profile', data);
+
+// WebSocket for operator live chat
+export function connectOperatorWs(token, onMessage, onClose) {
+  const wsUrl = (API_URL || 'http://localhost:8000').replace(/^http/, 'ws');
+  const ws = new WebSocket(`${wsUrl}/ws/operator?token=${token}`);
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      onMessage(data);
+    } catch (err) {
+      console.error('[WS operator] parse error:', err);
+    }
+  };
+  ws.onclose = (ev) => {
+    if (onClose) onClose();
+  };
+  return ws;
+}
+
+export { API_URL };
 export default api;
