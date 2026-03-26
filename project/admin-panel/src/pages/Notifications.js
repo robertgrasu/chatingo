@@ -4,6 +4,7 @@ import { useToast } from '../ToastContext';
 import { useNotifications } from '../NotificationContext';
 
 function timeAgo(ts) {
+  // ts here is already a timestamp number from NotificationContext
   const sec = Math.floor((Date.now() - ts) / 1000);
   if (sec < 60) return 'Chiar acum';
   const min = Math.floor(sec / 60);
@@ -14,6 +15,9 @@ function timeAgo(ts) {
   if (days < 30) return `${days} zile in urma`;
   return new Date(ts).toLocaleDateString('ro-RO');
 }
+
+// Ensure UTC dates from backend are parsed correctly
+function toUTC(s) { return s && !String(s).endsWith('Z') && !String(s).includes('+') ? s + 'Z' : s; }
 
 const NOTIF_ICONS = {
   conversation: {

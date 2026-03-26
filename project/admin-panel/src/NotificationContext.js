@@ -27,7 +27,7 @@ export function NotificationProvider({ children }) {
           desc: n.description,
           read: n.read,
           reference_id: n.reference_id,
-          time: new Date(n.created_at).getTime(),
+          time: new Date(n.created_at && !String(n.created_at).endsWith('Z') ? n.created_at + 'Z' : n.created_at).getTime(),
         }))
       );
       setUnreadCount(data.unread_count);

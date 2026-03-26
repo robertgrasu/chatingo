@@ -965,26 +965,23 @@ export default function Settings() {
           >
             <div className="grid grid-cols-3 gap-3">
               {[
-                { value: 'default', label: 'Classic', desc: 'Designul original cu header colorat' },
-                { value: 'livechat', label: 'LiveChat', desc: 'Design modern cu Dynamic Island' },
-                { value: 'modern', label: 'Modern', desc: 'Glass design cu gradient si animatii' },
+                { value: 'default', label: 'Edge' },
+                { value: 'livechat', label: 'Island' },
+                { value: 'modern', label: 'Aurora' },
               ].map((t) => (
                 <label
                   key={t.value}
-                  className={`flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                  className={`flex items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
                     config.widget_theme === t.value
                       ? 'border-primary bg-primary/5 dark:bg-primary/10'
                       : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                   }`}
                 >
                   <input type="radio" name="widget_theme" value={t.value} checked={config.widget_theme === t.value} onChange={(e) => setConfig({ ...config, widget_theme: e.target.value })} className="sr-only" />
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${config.widget_theme === t.value ? 'border-primary' : 'border-gray-300 dark:border-gray-500'}`}>
-                      {config.widget_theme === t.value && <div className="w-2 h-2 rounded-full bg-primary" />}
-                    </div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</span>
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${config.widget_theme === t.value ? 'border-primary' : 'border-gray-300 dark:border-gray-500'}`}>
+                    {config.widget_theme === t.value && <div className="w-2 h-2 rounded-full bg-primary" />}
                   </div>
-                  <p className="text-xs text-gray-400 ml-6">{t.desc}</p>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{t.label}</span>
                 </label>
               ))}
             </div>
@@ -1373,6 +1370,7 @@ export default function Settings() {
                 { key: 'enable_voice', label: 'Voice input', desc: 'Permite introducerea vocala' },
                 { key: 'show_online_status', label: 'Status online', desc: 'Afiseaza indicatorul verde de online' },
                 { key: 'show_subtitle', label: 'Subtitlu bot', desc: 'Afiseaza subtitlul sub numele botului' },
+                { key: 'enable_live_chat', label: 'Live Chat', desc: 'Permite vizitatorilor sa ceara un operator uman' },
               ].map((item) => (
                 <label key={item.key} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                   <div className="min-w-0 mr-3">

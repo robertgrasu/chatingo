@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getFeedback, getConversation, getWidgetConfig, updateWidgetConfig } from '../api';
+import { getFeedback, deleteFeedback, getConversation, getWidgetConfig, updateWidgetConfig } from '../api';
 import { useBot } from '../BotContext';
 import { useToast } from '../ToastContext';
 import PageHeader from '../components/PageHeader';
 import { MessageSkeleton } from '../components/Skeleton';
-import { timeAgo } from '../utils';
+import { timeAgo, formatDateTime, formatTime } from '../utils';
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Cele mai noi' },
@@ -78,6 +78,20 @@ export default function Reviews() {
     getConversation(fb.conversation_id)
       .then((res) => setDetail(res.data))
       .finally(() => setLoadingDetail(false));
+  };
+
+  const handleDeleteFeedback = async (fbId) => {
+    try {
+      await deleteFeedback(fbId);
+      addToast('Recenzie stearsa', 'success');
+      if (selectedFb?.id === fbId) {
+        setSelectedFb(null);
+        setDetail(null);
+      }
+      loadFeedback();
+    } catch {
+      addToast('Eroare la stergere', 'error');
+    }
   };
 
   const avgRating = data?.average_rating || 0;
@@ -234,7 +248,18 @@ export default function Reviews() {
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <Stars rating={fb.rating} size="w-3 h-3" />
-                        <span className="text-[10px] text-gray-400">{timeAgo(fb.created_at)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400">{timeAgo(fb.created_at)}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteFeedback(fb.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-300 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-400 transition-all"
+                            title="Sterge recenzia"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       {fb.comment && (
                         <p className="text-sm text-gray-900 dark:text-white mb-1 line-clamp-2 leading-snug">
@@ -341,7 +366,7 @@ export default function Reviews() {
                         <Stars rating={selectedFb.rating} size="w-3.5 h-3.5" />
                       </div>
                       <p className="text-xs text-gray-400">
-                        {new Date(detail.started_at).toLocaleString('ro-RO')} &middot; {detail.message_count} mesaje
+                        {formatDateTime(detail.started_at)} &middot; {detail.message_count} mesaje
                       </p>
                     </div>
                     <button
@@ -377,7 +402,7 @@ export default function Reviews() {
                           <p className={`text-[10px] mt-1 ${
                             msg.role === 'user' ? 'text-white/50' : 'text-gray-400'
                           }`}>
-                            {new Date(msg.created_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                            {formatTime(msg.created_at)}
                           </p>
                         </div>
                       </div>

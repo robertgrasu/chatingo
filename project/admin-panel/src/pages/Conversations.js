@@ -5,7 +5,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { ConversationSkeleton, MessageSkeleton } from '../components/Skeleton';
 import { useToast } from '../ToastContext';
 import { useBot } from '../BotContext';
-import { timeAgo } from '../utils';
+import { timeAgo, formatDateTime, formatTime } from '../utils';
 
 const PER_PAGE_OPTIONS = [15, 30, 50];
 
@@ -306,7 +306,7 @@ export default function Conversations() {
                     Conversatie
                   </p>
                   <p className="text-xs text-gray-400">
-                    {new Date(detail.started_at).toLocaleString('ro-RO')} &middot; {detail.message_count} mesaje
+                    {formatDateTime(detail.started_at)} &middot; {detail.message_count} mesaje
                   </p>
                 </div>
                 <button
@@ -343,7 +343,7 @@ export default function Conversations() {
                       <p className={`text-[10px] mt-1 ${
                         msg.role === 'user' ? 'text-white/50' : 'text-gray-400'
                       }`}>
-                        {new Date(msg.created_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                        {formatTime(msg.created_at)}
                       </p>
                     </div>
                   </div>
