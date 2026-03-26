@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { fetchWidgetConfig, sendMessage, submitFeedback } from './api';
+import { fetchWidgetConfig, sendMessage, submitFeedback, connectWebSocket, sendWsMessage, disconnectWebSocket } from './api';
 
 // Default theme (current)
 import DefaultBubble from './components/ChatBubble';
@@ -53,24 +53,144 @@ export default function ChatWidget() {
     avatar_size: 42,
     quick_replies: null,
   });
+  const [blocked, setBlocked] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [chatMode, setChatMode] = useState('bot'); // bot, waiting, live, closed
+  const [operatorName, setOperatorName] = useState(null);
+  const [operatorTyping, setOperatorTyping] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [liveChatEnabled, setLiveChatEnabled] = useState(false);
+  const wsRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
   const feedbackTimerRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  const handleWsMessage = useCallback((data) => {
+    lastActivityRef.current = Date.now();
+
+    switch (data.type) {
+      case 'bot_message':
+        setIsLoading(false);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: data.content, senderType: 'bot', time: Date.now() },
+        ]);
+        break;
+
+      case 'operator_message':
+        setOperatorTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: data.content, senderType: 'operator', operatorName: data.operator_name, time: Date.now() },
+        ]);
+        break;
+
+      case 'escalation_suggestion':
+        setMessages((prev) => [
+          ...prev,
+          { role: 'escalation', operatorsOnline: data.operators_online, time: Date.now() },
+        ]);
+        break;
+
+      case 'waiting_for_operator':
+        setChatMode('waiting');
+        setMessages((prev) => {
+          // Don't add duplicate waiting message
+          if (prev.some((m) => m.role === 'system' && m.content === 'Se cauta un operator disponibil...'))
+            return prev;
+          return [
+            ...prev,
+            { role: 'system', content: 'Se cauta un operator disponibil...', time: Date.now() },
+          ];
+        });
+        break;
+
+      case 'operator_connected':
+        setChatMode('live');
+        setOperatorName(data.operator_name);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'system', content: `Esti acum conectat cu ${data.operator_name}.`, time: Date.now() },
+        ]);
+        break;
+
+      case 'operator_typing':
+        setOperatorTyping(true);
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setOperatorTyping(false), 3000);
+        break;
+
+      case 'conversation_closed':
+        setChatMode('closed');
+        setOperatorName(null);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'system', content: 'Operatorul a incheiat conversatia.', time: Date.now() },
+        ]);
+        break;
+
+      case 'transferred_to_bot':
+        setChatMode('bot');
+        setOperatorName(null);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'system', content: 'Ati fost transferat inapoi la asistentul AI.', time: Date.now() },
+        ]);
+        break;
+
+      case 'operator_disconnected':
+        setChatMode('waiting');
+        setOperatorName(null);
+        setOperatorTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'system', content: 'Operatorul s-a deconectat. Se cauta alt operator...', time: Date.now() },
+        ]);
+        break;
+
+      case 'show_contact_form':
+        setShowContactForm(true);
+        break;
+
+      case 'contact_form_submitted':
+        setShowContactForm(false);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'system', content: 'Formularul a fost trimis! Vom reveni in curand.', time: Date.now() },
+        ]);
+        break;
+    }
+  }, []);
 
   useEffect(() => {
     fetchWidgetConfig().then((cfg) => {
+      if (!cfg) {
+        setBlocked(true); // Domain not authorized — stay invisible
+        return;
+      }
       setConfig((prev) => ({ ...prev, ...cfg }));
+      if (cfg.enable_live_chat) {
+        setLiveChatEnabled(true);
+        connectWebSocket(handleWsMessage);
+      }
     });
-  }, []);
+    return () => {
+      disconnectWebSocket();
+      clearTimeout(typingTimeoutRef.current);
+    };
+  }, [handleWsMessage]);
 
   // Feedback inactivity timer
   useEffect(() => {
     if (feedbackSubmitted || showFeedback) return;
 
     const checkInactivity = () => {
+      // Don't show feedback during active live chat
+      if (chatMode === 'live' || chatMode === 'waiting') return;
+
       const realMessages = messages.filter((m) => m.role !== 'feedback');
       if (
         realMessages.length >= MIN_MESSAGES_FOR_FEEDBACK &&
@@ -104,37 +224,73 @@ export default function ChatWidget() {
 
     const userMsg = { role: 'user', content: text, time: Date.now(), image: imageData };
     setMessages((prev) => [...prev, userMsg]);
-    setIsLoading(true);
 
-    try {
-      const data = await sendMessage(text, imageData);
-      lastActivityRef.current = Date.now();
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.response, time: Date.now() },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Scuze, a apărut o eroare. Încearcă din nou.',
-          time: Date.now(),
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
+    if (liveChatEnabled) {
+      // WebSocket mode
+      if (chatMode !== 'live') {
+        setIsLoading(true);
+      }
+      sendWsMessage({ type: 'message', content: text });
+    } else {
+      // HTTP mode (no live chat)
+      setIsLoading(true);
+      try {
+        const data = await sendMessage(text, imageData);
+        lastActivityRef.current = Date.now();
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: data.response, time: Date.now() },
+        ]);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: 'Scuze, a apărut o eroare. Încearcă din nou.',
+            time: Date.now(),
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
+
+  const handleRequestHuman = useCallback(() => {
+    // Remove escalation card so it can't be clicked again
+    setMessages((prev) => prev.filter((m) => m.role !== 'escalation'));
+    sendWsMessage({ type: 'request_human' });
+  }, []);
+
+  const handleDismissEscalation = useCallback(() => {
+    // Remove escalation message
+    setMessages((prev) => prev.filter((m) => m.role !== 'escalation'));
+  }, []);
+
+  const handleContactSubmit = useCallback((formData) => {
+    sendWsMessage({ type: 'contact_form', ...formData });
+  }, []);
 
   const handleQuickReply = useCallback((text) => {
     handleSend(text);
   }, []);
 
+  // Throttled typing indicator — send at most once every 2s
+  const lastTypingSent = useRef(0);
+  const handleInputChange = useCallback(() => {
+    if (chatMode === 'live' && Date.now() - lastTypingSent.current > 2000) {
+      lastTypingSent.current = Date.now();
+      sendWsMessage({ type: 'typing' });
+    }
+  }, [chatMode]);
+
   const handleFeedback = useCallback((rating, comment = null) => {
     setFeedbackSubmitted(true);
     submitFeedback(rating, comment);
   }, []);
+
+  // Domain not authorized — render nothing
+  if (blocked) return null;
 
   // Parse quick replies
   let quickReplies = [];
@@ -185,6 +341,15 @@ export default function ChatWidget() {
           onQuickReply={handleQuickReply}
           onFeedback={handleFeedback}
           feedbackSubmitted={feedbackSubmitted}
+          chatMode={chatMode}
+          operatorName={operatorName}
+          operatorTyping={operatorTyping}
+          showContactForm={showContactForm}
+          onRequestHuman={handleRequestHuman}
+          onDismissEscalation={handleDismissEscalation}
+          onContactSubmit={handleContactSubmit}
+          onInputChange={handleInputChange}
+          liveChatEnabled={liveChatEnabled}
         />
       )}
       <Bubble

@@ -1,4 +1,10 @@
-const getConfig = () => window.chatbotConfig || {};
+// Support both enterprise format (window.AiChat.c) and legacy (window.chatbotConfig)
+const getConfig = () => {
+  const ac = window.AiChat;
+  if (ac && ac.c) return { botId: ac.c.id, apiUrl: ac.c.server };
+  const legacy = window.chatbotConfig || {};
+  return { botId: legacy.botId, apiUrl: legacy.apiUrl };
+};
 
 // Generate cryptographically secure session ID (128-bit entropy)
 let _sessionId = null;
@@ -15,6 +21,7 @@ export async function fetchWidgetConfig() {
   const { apiUrl, botId } = getConfig();
   try {
     const res = await fetch(`${apiUrl}/api/widget/config/${botId}`);
+    if (res.status === 403) return null; // Domain not authorized — widget won't render
     const data = await res.json();
     // Resolve relative avatar_url to full URL
     if (data.avatar_url && !data.avatar_url.startsWith('http')) {
@@ -22,11 +29,7 @@ export async function fetchWidgetConfig() {
     }
     return data;
   } catch {
-    return {
-      welcome_message: 'Bună! Cu ce te pot ajuta?',
-      primary_color: '#6366f1',
-      position: 'bottom-right',
-    };
+    return null; // Network error or blocked — don't show widget
   }
 }
 
@@ -47,6 +50,60 @@ export async function sendMessage(message, image = null) {
   });
   if (!res.ok) throw new Error('Chat request failed');
   return await res.json();
+}
+
+// ── WebSocket for Live Chat ─────────────────────────────────
+let _ws = null;
+let _wsMessageHandler = null;
+let _reconnectTimer = null;
+let _wsConnected = false;
+
+export function connectWebSocket(onMessage) {
+  const { apiUrl, botId } = getConfig();
+  const wsUrl = apiUrl.replace(/^http/, 'ws');
+  _wsMessageHandler = onMessage;
+
+  _ws = new WebSocket(`${wsUrl}/ws/chat/${botId}/${getSessionId()}`);
+
+  _ws.onopen = () => {
+    _wsConnected = true;
+  };
+
+  _ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      _wsMessageHandler?.(data);
+    } catch {}
+  };
+
+  _ws.onclose = () => {
+    _wsConnected = false;
+    _reconnectTimer = setTimeout(() => connectWebSocket(onMessage), 3000);
+  };
+
+  _ws.onerror = () => {};
+
+  return _ws;
+}
+
+export function sendWsMessage(data) {
+  if (_ws && _ws.readyState === WebSocket.OPEN) {
+    _ws.send(JSON.stringify(data));
+  }
+}
+
+export function disconnectWebSocket() {
+  clearTimeout(_reconnectTimer);
+  _wsConnected = false;
+  if (_ws) {
+    _ws.onclose = null; // prevent reconnect
+    _ws.close();
+    _ws = null;
+  }
+}
+
+export function isWsConnected() {
+  return _wsConnected;
 }
 
 export async function submitFeedback(rating, comment = null) {
