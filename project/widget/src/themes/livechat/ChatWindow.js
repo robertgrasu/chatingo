@@ -11,6 +11,9 @@ export default function ChatWindow({
   enableEmoji = true, enableAttachments = true, enableVoice = false,
   sendButtonColor, userMessageColor, avatarSize = 42,
   quickReplies = [], onQuickReply, onFeedback, feedbackSubmitted,
+  chatMode, operatorName: opName, operatorTyping, showContactForm,
+  onRequestHuman, onDismissEscalation, onContactSubmit, liveChatEnabled,
+  onInputChange,
 }) {
   const isRight = position !== 'bottom-left';
   const font = 'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"';
@@ -231,7 +234,7 @@ export default function ChatWindow({
                   color: 'rgb(17, 17, 17)',
                   transition: 'font-size 700ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}>
-                  {botName}
+                  {chatMode === 'live' && opName ? opName : botName}
                 </span>
                 {barExpanded && showSubtitle && (
                   <span style={{
@@ -244,7 +247,7 @@ export default function ChatWindow({
                     lineHeight: '1.1rem',
                     marginTop: '1px',
                   }}>
-                    {botSubtitle}
+                    {chatMode === 'live' ? 'Live Chat' : chatMode === 'waiting' ? 'Se conecteaza...' : botSubtitle}
                   </span>
                 )}
               </div>
@@ -270,6 +273,12 @@ export default function ChatWindow({
             userMessageColor={userMessageColor}
             onFeedback={onFeedback}
             feedbackSubmitted={feedbackSubmitted}
+            operatorTyping={operatorTyping}
+            onRequestHuman={onRequestHuman}
+            onDismissEscalation={onDismissEscalation}
+            onContactSubmit={onContactSubmit}
+            showContactForm={showContactForm}
+            chatMode={chatMode}
           />
         </div>
 
@@ -288,6 +297,7 @@ export default function ChatWindow({
           enableEmoji={enableEmoji}
           enableAttachments={enableAttachments}
           enableVoice={enableVoice}
+          onInputChange={onInputChange}
         />
 
         {/* Powered by footer */}

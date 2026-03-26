@@ -12,6 +12,9 @@ export default function ChatWindow({
   enableEmoji = true, enableAttachments = true, enableVoice = false,
   sendButtonColor, userMessageColor, avatarSize = 42,
   quickReplies = [], onQuickReply, onFeedback, feedbackSubmitted,
+  chatMode, operatorName: opName, operatorTyping, showContactForm,
+  onRequestHuman, onDismissEscalation, onContactSubmit, liveChatEnabled,
+  onInputChange,
 }) {
   const isRight = position !== 'bottom-left';
   const font = 'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"';
@@ -84,13 +87,13 @@ export default function ChatWindow({
               <div style={{
                 color: '#fff', fontSize: showSubtitle ? '14px' : '16px', fontWeight: 600, lineHeight: showSubtitle ? '18px' : '22px',
               }}>
-                {botName}
+                {chatMode === 'live' && opName ? opName : botName}
               </div>
               {showSubtitle && (
                 <div style={{
                   color: 'rgba(255,255,255,0.5)', fontSize: '12px', lineHeight: '16px', marginTop: '1px',
                 }}>
-                  {botSubtitle}
+                  {chatMode === 'live' ? 'Live Chat' : chatMode === 'waiting' ? 'Se conecteaza...' : botSubtitle}
                 </div>
               )}
             </div>
@@ -129,6 +132,12 @@ export default function ChatWindow({
           botMessageColor={botMessageColor} avatarUrl={avatarUrl}
           userMessageColor={userMessageColor}
           onFeedback={onFeedback} feedbackSubmitted={feedbackSubmitted}
+          operatorTyping={operatorTyping}
+          onRequestHuman={onRequestHuman}
+          onDismissEscalation={onDismissEscalation}
+          onContactSubmit={onContactSubmit}
+          showContactForm={showContactForm}
+          chatMode={chatMode}
         />
         {quickReplies.length > 0 && (
           <QuickReplies replies={quickReplies} onSelect={onQuickReply} color={color} />
@@ -140,6 +149,7 @@ export default function ChatWindow({
           enableEmoji={enableEmoji}
           enableAttachments={enableAttachments}
           enableVoice={enableVoice}
+          onInputChange={onInputChange}
         />
       </div>
     </div>

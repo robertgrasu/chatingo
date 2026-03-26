@@ -4,6 +4,7 @@ import EmojiPicker from './EmojiPicker';
 export default function InputBox({
   onSend, disabled, color, placeholderText = 'Mesaj...',
   sendButtonColor, enableEmoji = true, enableAttachments = true, enableVoice = false,
+  onInputChange,
 }) {
   const [text, setText] = useState('');
   const [image, setImage] = useState(null);
@@ -159,7 +160,7 @@ export default function InputBox({
         <textarea
           ref={inputRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => { setText(e.target.value); onInputChange?.(); }}
           onKeyDown={handleKeyDown}
           placeholder={placeholderText}
           disabled={disabled}

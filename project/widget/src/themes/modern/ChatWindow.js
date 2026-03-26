@@ -12,6 +12,9 @@ export default function ChatWindow({
   enableEmoji = true, enableAttachments = true, enableVoice = false,
   sendButtonColor, userMessageColor, avatarSize = 42,
   quickReplies = [], onQuickReply, onFeedback, feedbackSubmitted,
+  chatMode, operatorName: opName, operatorTyping, showContactForm,
+  onRequestHuman, onDismissEscalation, onContactSubmit, liveChatEnabled,
+  onInputChange,
 }) {
   const isRight = position !== 'bottom-left';
   const grad = gradientEndColor
@@ -110,7 +113,7 @@ export default function ChatWindow({
               lineHeight: '1.3',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {botName}
+              {chatMode === 'live' && opName ? opName : botName}
             </div>
             {showSubtitle && (
               <div style={{
@@ -118,7 +121,7 @@ export default function ChatWindow({
                 lineHeight: '1.3', marginTop: '2px',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
-                {botSubtitle || 'Online'}
+                {chatMode === 'live' ? 'Live Chat' : chatMode === 'waiting' ? 'Se conecteaza...' : (botSubtitle || 'Online')}
               </div>
             )}
           </div>
@@ -163,6 +166,12 @@ export default function ChatWindow({
             userMessageColor={userMessageColor}
             onFeedback={onFeedback}
             feedbackSubmitted={feedbackSubmitted}
+            operatorTyping={operatorTyping}
+            onRequestHuman={onRequestHuman}
+            onDismissEscalation={onDismissEscalation}
+            onContactSubmit={onContactSubmit}
+            showContactForm={showContactForm}
+            chatMode={chatMode}
           />
 
           {/* Quick Replies */}
@@ -183,6 +192,7 @@ export default function ChatWindow({
             enableEmoji={enableEmoji}
             enableAttachments={enableAttachments}
             enableVoice={enableVoice}
+            onInputChange={onInputChange}
           />
 
           {/* Footer */}

@@ -84,11 +84,11 @@ function shouldShowTimeSeparator(prevMsg, currMsg) {
 
 const msgShadow = 'rgba(0,0,0,0.15) 0px 0.6px 0.54px -1.33px, rgba(0,0,0,0.13) 0px 2.29px 2.06px -2.67px, rgba(0,0,0,0.04) 0px 10px 9px -4px';
 
-export default function MessageList({ messages, isLoading, color, botName, botSubtitle, botMessageColor, avatarColor, avatarUrl, userMessageColor, onFeedback, feedbackSubmitted }) {
+export default function MessageList({ messages, isLoading, color, botName, botSubtitle, botMessageColor, avatarColor, avatarUrl, userMessageColor, onFeedback, feedbackSubmitted, operatorTyping, onRequestHuman, onDismissEscalation, onContactSubmit, showContactForm, chatMode }) {
   const endRef = useRef(null);
   const [, setTick] = useState(0);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading, operatorTyping]);
   useEffect(() => {
     const iv = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(iv);
@@ -107,6 +107,32 @@ export default function MessageList({ messages, isLoading, color, botName, botSu
       {messages.map((msg, i) => {
         if (msg.role === 'feedback') {
           return <FeedbackCard key={i} onSubmit={onFeedback} color={color} submitted={feedbackSubmitted} />;
+        }
+        if (msg.role === 'system') {
+          return (
+            <div key={i} style={{ textAlign: 'center', padding: '8px 16px', margin: '4px 0' }}>
+              <span style={{ fontSize: '12px', color: 'rgb(112,112,112)', background: 'rgba(0,0,0,0.04)', borderRadius: '12px', padding: '4px 12px', display: 'inline-block' }}>
+                {msg.content}
+              </span>
+            </div>
+          );
+        }
+        if (msg.role === 'escalation') {
+          return (
+            <div key={i} style={{ margin: '8px 0', padding: '12px 16px', background: 'rgb(255,255,255)', borderRadius: '12px', boxShadow: msgShadow }}>
+              <div style={{ fontSize: '13px', color: 'rgb(55,65,81)', marginBottom: '10px', lineHeight: '1.4' }}>
+                Nu am gasit cel mai bun raspuns. Doriti sa vorbiti cu un operator?
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={onRequestHuman} style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: color, color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                  {msg.operatorsOnline ? 'Da, conecteaza-ma' : 'Lasa un mesaj'}
+                </button>
+                <button onClick={onDismissEscalation} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: '12px', cursor: 'pointer' }}>
+                  Nu, multumesc
+                </button>
+              </div>
+            </div>
+          );
         }
         const isUser = msg.role === 'user';
         const prevMsg = i > 0 ? messages[i - 1] : null;
@@ -307,54 +333,67 @@ export default function MessageList({ messages, isLoading, color, botName, botSu
         );
       })}
 
-      {/* Typing indicator */}
-      {isLoading && (
+      {/* Operator typing indicator */}
+      {operatorTyping && (
         <div className="lc-msg" style={{ display: 'flex', marginBottom: '1em' }}>
-          {/* Avatar */}
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            minWidth: '20px',
-            margin: '0 8px 0 0',
-            flexGrow: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            minWidth: '20px', margin: '0 8px 0 0', flexGrow: 0,
           }}>
             {avatarUrl ? (
-              <img src={avatarUrl} alt="" style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-                display: 'block',
-              }} />
+              <img src={avatarUrl} alt="" style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
             ) : (
-              <div style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '50%',
-                background: avatarColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                   <path d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                  />
+                    stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
             )}
           </div>
           <div>
             <div style={{
-              display: 'inline-block',
-              padding: '14px 18px',
-              borderRadius: '10px',
-              background: 'rgb(255, 255, 255)',
-              boxShadow: msgShadow,
-              display: 'flex',
-              gap: '4px',
-              alignItems: 'center',
+              display: 'inline-block', padding: '14px 18px', borderRadius: '10px',
+              background: 'rgb(255, 255, 255)', boxShadow: msgShadow,
+              display: 'flex', gap: '4px', alignItems: 'center',
+            }}>
+              {[1, 2, 3].map((n) => (
+                <span key={n} className={`cw-d${n}`} style={{
+                  width: '6px', height: '6px', borderRadius: '50%',
+                  backgroundColor: 'rgb(112, 112, 112)', display: 'inline-block',
+                }} />
+              ))}
+            </div>
+            <div style={{ fontSize: '11px', color: 'rgb(112, 112, 112)', marginTop: '4px' }}>
+              Operator scrie...
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bot typing indicator */}
+      {isLoading && (
+        <div className="lc-msg" style={{ display: 'flex', marginBottom: '1em' }}>
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            minWidth: '20px', margin: '0 8px 0 0', flexGrow: 0,
+          }}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+            ) : (
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                  <path d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                    stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+          <div>
+            <div style={{
+              display: 'inline-block', padding: '14px 18px', borderRadius: '10px',
+              background: 'rgb(255, 255, 255)', boxShadow: msgShadow,
+              display: 'flex', gap: '4px', alignItems: 'center',
             }}>
               {[1, 2, 3].map((n) => (
                 <span key={n} className={`cw-d${n}`} style={{

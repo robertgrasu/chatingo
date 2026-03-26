@@ -4,6 +4,7 @@ import EmojiPicker from '../../components/EmojiPicker';
 export default function InputBox({
   onSend, disabled, color, placeholderText = 'Scrie un mesaj...',
   sendButtonColor, enableEmoji = true, enableAttachments = true, enableVoice = false,
+  onInputChange,
 }) {
   const [text, setText] = useState('');
   const [image, setImage] = useState(null);
@@ -208,7 +209,7 @@ export default function InputBox({
             ref={inputRef}
             type="text"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => { setText(e.target.value); onInputChange?.(); }}
             onKeyDown={handleKeyDown}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
