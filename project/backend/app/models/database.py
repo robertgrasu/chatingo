@@ -17,10 +17,12 @@ from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 from app.config import settings
 
 
+# Clasa de baza din care mostenesc toate modelele SQLAlchemy
 class Base(DeclarativeBase):
     pass
 
 
+# Categoria in care sunt grupate documentele din baza de cunostinte a unui bot
 class Category(Base):
     __tablename__ = "categories"
 
@@ -36,6 +38,7 @@ class Category(Base):
     )
 
 
+# Un document incarcat in baza de cunostinte, cu starea procesarii si numarul de bucati
 class Document(Base):
     __tablename__ = "documents"
 
@@ -44,7 +47,7 @@ class Document(Base):
     filename = Column(String(500), nullable=False)
     category_id = Column(String, ForeignKey("categories.id"), nullable=False)
     content = Column(Text, nullable=True)
-    status = Column(String(20), default="processing")  # ready, processing, error
+    status = Column(String(20), default="processing")  # ready, processing sau error
     chunk_count = Column(Integer, default=0)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
@@ -53,6 +56,7 @@ class Document(Base):
     category = relationship("Category", back_populates="documents")
 
 
+# Configuratia unui bot: aspectul widget-ului, comportamentul AI, live chat, domeniile permise si proprietarul
 class BotConfig(Base):
     __tablename__ = "bot_configs"
 
@@ -85,7 +89,7 @@ class BotConfig(Base):
     bubble_icon = Column(String(20), default="chat")
     avatar_size = Column(Integer, default=42)
     quick_replies = Column(Text, nullable=True)
-    # AI Behavior settings
+    # Setarile de comportament AI
     system_prompt = Column(Text, nullable=True)
     temperature = Column(Float, default=0.7)
     max_tokens = Column(Integer, default=500)
@@ -94,11 +98,13 @@ class BotConfig(Base):
     language = Column(String(10), default="auto")
     enable_live_chat = Column(Boolean, default=False)
     allowed_domains = Column(Text, nullable=True)  # JSON array: '["example.com","*.example.com"]'
+    owner_id = Column(String, ForeignKey("admin_users.id"), nullable=True, index=True)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
 
+# O conversatie dintre un vizitator si bot, cu starea ei (bot, waiting, live, closed) si operatorul care a preluat-o
 class Conversation(Base):
     __tablename__ = "conversations"
 
@@ -112,7 +118,7 @@ class Conversation(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
     message_count = Column(Integer, default=0)
-    status = Column(String(20), default="bot")  # bot, waiting, live, closed
+    status = Column(String(20), default="bot")  # bot, waiting, live sau closed
     operator_id = Column(String, ForeignKey("admin_users.id"), nullable=True)
 
     messages = relationship(
@@ -121,6 +127,7 @@ class Conversation(Base):
     )
 
 
+# Un mesaj dintr-o conversatie, trimis de vizitator, bot sau operator
 class Message(Base):
     __tablename__ = "messages"
 
@@ -128,10 +135,10 @@ class Message(Base):
     conversation_id = Column(
         String, ForeignKey("conversations.id"), nullable=False
     )
-    role = Column(String(20), nullable=False)  # user, assistant
+    role = Column(String(20), nullable=False)  # user sau assistant
     content = Column(Text, nullable=False)
     image_url = Column(Text, nullable=True)
-    sender_type = Column(String(20), nullable=True)  # bot, operator, system, user (NULL=legacy)
+    sender_type = Column(String(20), nullable=True)  # bot, operator, system sau user (NULL pentru mesajele vechi)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -139,6 +146,7 @@ class Message(Base):
     conversation = relationship("Conversation", back_populates="messages")
 
 
+# Recenzia (1-5 stele si comentariu) lasata de un vizitator la finalul unei conversatii
 class ConversationFeedback(Base):
     __tablename__ = "conversation_feedback"
 
@@ -148,19 +156,20 @@ class ConversationFeedback(Base):
     )
     bot_id = Column(String(100), nullable=False, index=True)
     session_id = Column(String(100), nullable=False)
-    rating = Column(Integer, nullable=False)  # 1-5 stars
+    rating = Column(Integer, nullable=False)  # 1-5 stele
     comment = Column(Text, nullable=True)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
 
+# Notificarea afisata adminilor pentru evenimente (conversatii, recenzii, documente, sistem)
 class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     bot_id = Column(String(100), nullable=False, index=True)
-    type = Column(String(30), nullable=False)  # conversation, feedback, document, system
+    type = Column(String(30), nullable=False)  # conversation, feedback, document sau system
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     read = Column(Boolean, default=False)
@@ -170,6 +179,7 @@ class Notification(Base):
     )
 
 
+# Contul unui administrator; team_owner_id leaga conturile create de un proprietar de echipa
 class AdminUser(Base):
     __tablename__ = "admin_users"
 
@@ -184,8 +194,10 @@ class AdminUser(Base):
     last_login = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     refresh_token = Column(String(255), nullable=True)
+    team_owner_id = Column(String, ForeignKey("admin_users.id"), nullable=True)
 
 
+# Mesajul lasat prin formularul de contact cand niciun operator nu este online
 class ContactSubmission(Base):
     __tablename__ = "contact_submissions"
 
@@ -198,12 +210,13 @@ class ContactSubmission(Base):
     visitor_name = Column(String(200), nullable=False)
     visitor_email = Column(String(300), nullable=False)
     message = Column(Text, nullable=False)
-    status = Column(String(20), default="new")  # new, read, replied
+    status = Column(String(20), default="new")  # new, read sau replied
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
 
+# Disponibilitatea unui operator pentru live chat
 class OperatorStatus(Base):
     __tablename__ = "operator_status"
 
@@ -215,15 +228,18 @@ class OperatorStatus(Base):
     last_seen_at = Column(DateTime, nullable=True)
 
 
+# Conexiunea la baza de date si fabrica de sesiuni folosita in tot backend-ul
 engine = create_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+# Creeaza tabelele, aplica migrarile simple si adauga datele implicite (botul de baza si contul admin)
 def init_db():
     Base.metadata.create_all(bind=engine)
 
-    # Migrations: add columns that create_all won't add to existing tables
+    # Migrari: coloanele noi se adauga cu ALTER TABLE, pentru ca create_all nu modifica tabelele existente
     from sqlalchemy import text
+    # Fiecare comanda foloseste IF NOT EXISTS, deci poate rula la fiecare pornire fara probleme
     with engine.connect() as conn:
         try:
             conn.execute(text(
@@ -277,7 +293,7 @@ def init_db():
             conn.execute(text(
                 "ALTER TABLE conversation_feedback ADD COLUMN IF NOT EXISTS comment TEXT"
             ))
-            # Multi-bot: add bot_id to categories and documents
+            # Multi-bot: categoriile si documentele primesc bot_id
             conn.execute(text(
                 "ALTER TABLE categories ADD COLUMN IF NOT EXISTS bot_id VARCHAR(100) DEFAULT 'bot_123'"
             ))
@@ -290,7 +306,7 @@ def init_db():
             conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_documents_bot_id ON documents (bot_id)"
             ))
-            # AI Behavior columns
+            # Coloanele pentru comportamentul AI
             conn.execute(text(
                 "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS system_prompt TEXT"
             ))
@@ -309,7 +325,7 @@ def init_db():
             conn.execute(text(
                 "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'auto'"
             ))
-            # Live chat columns
+            # Coloanele pentru live chat
             conn.execute(text(
                 "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS enable_live_chat BOOLEAN DEFAULT FALSE"
             ))
@@ -322,16 +338,26 @@ def init_db():
             conn.execute(text(
                 "ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_type VARCHAR(20)"
             ))
-            # Domain licensing
+            # Licentierea pe domenii
             conn.execute(text(
                 "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS allowed_domains TEXT"
             ))
+            # Proprietatea botilor (izolare pe echipe)
+            conn.execute(text(
+                "ALTER TABLE bot_configs ADD COLUMN IF NOT EXISTS owner_id VARCHAR REFERENCES admin_users(id)"
+            ))
+            conn.execute(text(
+                "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS team_owner_id VARCHAR REFERENCES admin_users(id)"
+            ))
             conn.commit()
+        # Erorile de migrare sunt ignorate, pentru ca aplicatia sa porneasca oricum
         except Exception:
             pass
 
+    # Se pregateste sesiunea pentru crearea datelor implicite
     db = SessionLocal()
     try:
+        # Se creeaza botul implicit daca nu exista
         existing = db.query(BotConfig).filter_by(bot_id="bot_123").first()
         if not existing:
             default_bot = BotConfig(
@@ -343,9 +369,10 @@ def init_db():
             db.add(default_bot)
             db.commit()
 
-        # Seed default admin user if none exists
+        # Se creeaza contul admin implicit cu o parola aleatoare, afisata o singura data in consola
         admin_exists = db.query(AdminUser).first()
         if not admin_exists:
+            # Parola generata este afisata o singura data in consola
             import secrets
             import bcrypt as _bcrypt
             default_password = secrets.token_urlsafe(16)
@@ -364,10 +391,26 @@ def init_db():
             print(f"  Password: {default_password}")
             print("  CHANGE THIS PASSWORD IMMEDIATELY!")
             print("=" * 60)
+
+        # Botii creati inainte de sistemul de proprietate primesc ca proprietar cel mai vechi cont admin,
+        # Botii creati inainte de sistemul de proprietate primesc ca proprietar cel mai vechi cont admin, ca sa nu devina invizibili dupa actualizare
+        orphan_bots = db.query(BotConfig).filter(BotConfig.owner_id.is_(None)).all()
+        if orphan_bots:
+            primary_admin = (
+                db.query(AdminUser)
+                .filter(AdminUser.role == "admin")
+                .order_by(AdminUser.created_at.asc())
+                .first()
+            )
+            if primary_admin:
+                for bot in orphan_bots:
+                    bot.owner_id = primary_admin.id
+                db.commit()
     finally:
         db.close()
 
 
+# Dependinta FastAPI care ofera o sesiune de baza de date si o inchide dupa cerere
 def get_db():
     db = SessionLocal()
     try:
