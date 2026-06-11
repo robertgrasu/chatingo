@@ -13,18 +13,21 @@ from app.models.schemas import WidgetConfigPublic, WidgetConfigResponse, WidgetC
 from app.rate_limiter import limiter
 from app.services.auth import get_current_admin
 from app.services.domain_check import get_request_origin, is_origin_allowed
+from app.services.ownership import ensure_bot_accessible, get_owned_bot, team_root_id
 
 router = APIRouter(prefix="/widget")
 
+# Folderele unde se salveaza fisierele statice si avatarele botilor
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static")
 AVATARS_DIR = os.path.join(STATIC_DIR, "avatars")
 os.makedirs(AVATARS_DIR, exist_ok=True)
 
+# Dimensiunea maxima permisa pentru un avatar
 MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
 
 
+# Transforma configuratia botului in varianta publica, folosita de widget, cu valori implicite pentru campurile goale
 def _config_to_public(config: BotConfig) -> WidgetConfigPublic:
-    """Public config - only UI fields, NO AI behavior secrets."""
     return WidgetConfigPublic(
         welcome_message=config.welcome_message,
         bot_name=config.bot_name or "AI Assistant",
@@ -58,20 +61,21 @@ def _config_to_public(config: BotConfig) -> WidgetConfigPublic:
     )
 
 
+# Citeste lista de domenii permise, salvata ca JSON in baza de date
 def _parse_allowed_domains(config: BotConfig) -> list[str]:
-    """Parse allowed_domains JSON from DB to list."""
     if not config.allowed_domains:
         return []
     try:
         import json
+        # Lista de domenii este salvata ca JSON text
         domains = json.loads(config.allowed_domains)
         return domains if isinstance(domains, list) else []
     except (json.JSONDecodeError, TypeError):
         return []
 
 
+# Varianta completa a configuratiei, cu setarile AI, pentru admini
 def _config_to_full(config: BotConfig) -> WidgetConfigResponse:
-    """Full config with AI behavior - ADMIN ONLY."""
     public = _config_to_public(config)
     return WidgetConfigResponse(
         **public.model_dump(),
@@ -84,21 +88,22 @@ def _config_to_full(config: BotConfig) -> WidgetConfigResponse:
     )
 
 
+# Sterge un fisier doar daca se afla in folderul de avatare, ca sa se evite path traversal
 def _safe_delete_file(filepath: str):
-    """Delete file only if it's inside AVATARS_DIR (path traversal prevention)."""
     real_path = os.path.realpath(filepath)
     real_avatars = os.path.realpath(AVATARS_DIR)
+    # Se sterge doar daca fisierul este in folderul de avatare
     if real_path.startswith(real_avatars + os.sep) and os.path.exists(real_path):
         os.remove(real_path)
 
 
-# GET config = PUBLIC (widget needs it) - NO AI secrets exposed
+# Configuratia publica: widget-ul are nevoie de ea, dar nu contine secrete AI
 @router.get("/config/{bot_id}", response_model=WidgetConfigPublic)
 @limiter.limit("60/minute")
 async def get_widget_config(request: Request, bot_id: str, db: Session = Depends(get_db)):
     config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
 
-    # Domain licensing check
+    # Licentierea pe domeniu: configuratia se da doar domeniilor permise
     if config and config.allowed_domains:
         origin = get_request_origin(request)
         if not is_origin_allowed(config.allowed_domains, origin):
@@ -108,7 +113,7 @@ async def get_widget_config(request: Request, bot_id: str, db: Session = Depends
             )
 
     if not config:
-        # No config = no bot = no allowed domains → 403
+        # Fara configuratie nu exista bot, deci raspunsul este 403
         raise HTTPException(
             status_code=403,
             detail="Bot inexistent sau niciun domeniu configurat",
@@ -116,19 +121,18 @@ async def get_widget_config(request: Request, bot_id: str, db: Session = Depends
     return _config_to_public(config)
 
 
-# GET full config = ADMIN ONLY (includes system_prompt, temperature, etc.)
+# Configuratia completa (cu prompt, temperatura etc.) este doar pentru admini
 @router.get("/config/{bot_id}/full", response_model=WidgetConfigResponse)
 async def get_widget_config_full(
     bot_id: str, db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
-    config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
-    if not config:
-        raise HTTPException(status_code=404, detail="Config not found")
+    config = get_owned_bot(bot_id, db, admin)
+    # Se returneaza configuratia completa actualizata
     return _config_to_full(config)
 
 
-# PUT config = ADMIN AUTH REQUIRED
+# Actualizarea configuratiei necesita autentificare de admin
 @router.put("/config/{bot_id}", response_model=WidgetConfigResponse)
 async def update_widget_config(
     bot_id: str, data: WidgetConfigUpdate, db: Session = Depends(get_db),
@@ -136,9 +140,12 @@ async def update_widget_config(
 ):
     config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
     if not config:
-        config = BotConfig(bot_id=bot_id)
+        config = BotConfig(bot_id=bot_id, owner_id=team_root_id(admin))
         db.add(config)
+    else:
+        ensure_bot_accessible(bot_id, db, admin)
 
+    # Se actualizeaza doar campurile trimise in cerere; sirurile goale sterg valoarea acolo unde e permis
     if data.welcome_message is not None:
         config.welcome_message = data.welcome_message
     if data.bot_name is not None:
@@ -195,7 +202,7 @@ async def update_widget_config(
         config.avatar_size = data.avatar_size
     if data.quick_replies is not None:
         config.quick_replies = data.quick_replies if data.quick_replies != "" else None
-    # AI Behavior
+    # Setarile de comportament AI
     if data.system_prompt is not None:
         config.system_prompt = data.system_prompt if data.system_prompt != "" else None
     if data.temperature is not None:
@@ -217,7 +224,7 @@ async def update_widget_config(
     return _config_to_full(config)
 
 
-# POST avatar = ADMIN AUTH REQUIRED + file security
+# Incarcarea avatarului necesita autentificare de admin, iar fisierul este verificat
 @router.post("/avatar/{bot_id}")
 async def upload_avatar(
     bot_id: str,
@@ -225,29 +232,33 @@ async def upload_avatar(
     db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
-    # Reject SVG (XSS vector)
+    ensure_bot_accessible(bot_id, db, admin)
+
+    # SVG este respins, pentru ca poate contine cod JavaScript
     if file.content_type == "image/svg+xml":
         raise HTTPException(status_code=400, detail="SVG nu este permis (risc XSS)")
 
+    # Sunt permise doar formatele raster uzuale
     allowed = {"image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"}
     if file.content_type not in allowed:
         raise HTTPException(status_code=400, detail="Tip de fisier invalid. Doar PNG, JPG, GIF, WebP.")
 
-    # Read with size limit
+    # Se citeste fisierul si se verifica dimensiunea maxima
     contents = await file.read()
     if len(contents) > MAX_AVATAR_SIZE:
         raise HTTPException(status_code=413, detail="Fisier prea mare (max 2MB)")
 
-    # Validate actual image content with PIL (magic bytes check)
+    # Continutul se verifica cu PIL, nu doar tipul declarat
     try:
         img = Image.open(io.BytesIO(contents))
         img.verify()
     except Exception:
         raise HTTPException(status_code=400, detail="Fisierul nu este o imagine valida")
 
-    # Determine safe extension from actual format
+    # Extensia se alege dupa formatul real al imaginii
     allowed_formats = {"PNG", "JPEG", "GIF", "WEBP"}
     format_to_ext = {"PNG": ".png", "JPEG": ".jpg", "GIF": ".gif", "WEBP": ".webp"}
+    # Imaginea se deschide din nou pentru ca verify() o face inutilizabila
     img_reopened = Image.open(io.BytesIO(contents))
 
     if img_reopened.format not in allowed_formats:
@@ -255,7 +266,7 @@ async def upload_avatar(
 
     ext = format_to_ext[img_reopened.format]
 
-    # Re-encode to strip EXIF metadata and any embedded payloads
+    # Imaginea se re-codifica pentru a elimina metadatele EXIF si continutul ascuns
     clean_buf = io.BytesIO()
     if img_reopened.format == "JPEG":
         img_reopened.convert("RGB").save(clean_buf, format="JPEG", quality=90)
@@ -266,45 +277,47 @@ async def upload_avatar(
     filename = f"avatar_{bot_id}_{uuid.uuid4().hex[:8]}{ext}"
     filepath = os.path.join(AVATARS_DIR, filename)
 
-    # Path traversal check
+    # Se verifica faptul ca fisierul ramane in folderul de avatare
     real_path = os.path.realpath(filepath)
     if not real_path.startswith(os.path.realpath(AVATARS_DIR) + os.sep):
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    # Remove old avatar file
+    # Avatarul vechi se sterge de pe disc
     config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
     if config and config.avatar_url:
         old_filename = config.avatar_url.split("/")[-1]
         _safe_delete_file(os.path.join(AVATARS_DIR, old_filename))
 
+    # Se salveaza fisierul pe disc si se asociaza botului
     with open(filepath, "wb") as f:
         f.write(clean_bytes)
 
+    # Calea publica a avatarului, salvata in configuratia botului
     avatar_url = f"/static/avatars/{filename}"
     if not config:
-        config = BotConfig(bot_id=bot_id, avatar_url=avatar_url)
+        config = BotConfig(bot_id=bot_id, avatar_url=avatar_url, owner_id=team_root_id(admin))
         db.add(config)
     else:
         config.avatar_url = avatar_url
 
     db.commit()
+    # Se returneaza calea noului avatar
     return {"avatar_url": avatar_url}
 
 
-# DELETE avatar = ADMIN AUTH REQUIRED
+# Stergerea avatarului necesita autentificare de admin
 @router.delete("/avatar/{bot_id}")
 async def delete_avatar(
     bot_id: str, db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
-    config = db.query(BotConfig).filter(BotConfig.bot_id == bot_id).first()
-    if not config:
-        raise HTTPException(status_code=404, detail="Config not found")
+    config = get_owned_bot(bot_id, db, admin)
 
     if config.avatar_url:
         old_filename = config.avatar_url.split("/")[-1]
         _safe_delete_file(os.path.join(AVATARS_DIR, old_filename))
 
+    # Avatarul este scos din configuratie
     config.avatar_url = None
     db.commit()
     return {"status": "deleted"}
