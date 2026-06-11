@@ -1,28 +1,33 @@
 from pydantic import BaseModel, Field
 
 
-# ── Auth Schemas ──────────────────────────────────────────────
+# ── Scheme pentru autentificare ──────────────────────────
 
+# Datele trimise la autentificare
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=1, max_length=128)
 
 
+# Perechea de token-uri returnata dupa autentificare
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
 
 
+# Cererea de reinnoire a token-ului de acces folosind token-ul de refresh
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=1, max_length=500)
 
 
+# Schimbarea parolei proprii, cu verificarea parolei curente
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(..., min_length=1, max_length=128)
     new_password: str = Field(..., min_length=6, max_length=128)
 
 
+# Datele de baza ale utilizatorului autentificat
 class UserResponse(BaseModel):
     id: str
     username: str
@@ -30,6 +35,7 @@ class UserResponse(BaseModel):
     role: str
 
 
+# Datele complete ale unui utilizator, afisate in managementul utilizatorilor
 class UserDetailResponse(BaseModel):
     id: str
     username: str
@@ -40,13 +46,15 @@ class UserDetailResponse(BaseModel):
     last_login: str | None = None
 
 
+# Datele necesare pentru crearea unui utilizator nou
 class UserCreateRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=50)
-    password: str = Field(..., min_length=6, max_length=128)
+    password: str = Field(..., min_length=4, max_length=128)
     email: str | None = Field(None, max_length=200)
     role: str = Field("admin", max_length=20)
 
 
+# Campurile care pot fi modificate de un admin la un utilizator
 class UserUpdateRequest(BaseModel):
     username: str | None = Field(None, min_length=2, max_length=50)
     email: str | None = Field(None, max_length=200)
@@ -54,30 +62,35 @@ class UserUpdateRequest(BaseModel):
     is_active: bool | None = None
 
 
+# Campurile pe care utilizatorul si le poate modifica singur
 class ProfileUpdateRequest(BaseModel):
     username: str | None = Field(None, min_length=2, max_length=50)
     email: str | None = Field(None, max_length=200)
 
 
+# Resetarea parolei unui utilizator de catre un admin
 class AdminResetPasswordRequest(BaseModel):
-    new_password: str = Field(..., min_length=6, max_length=128)
+    new_password: str = Field(..., min_length=4, max_length=128)
 
 
-# ── Chat Schemas ──────────────────────────────────────────────
+# ── Scheme pentru chat ─────────────────────────────────
 
+# Mesajul trimis de vizitator din widget, cu botul, sesiunea si imaginea optionala (base64)
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=10000)
     bot_id: str = Field(default="bot_123", max_length=50)
     session_id: str | None = Field(default=None, max_length=100)
-    image: str | None = Field(default=None, max_length=10_000_000)  # ~7MB base64
+    image: str | None = Field(default=None, max_length=10_000_000)  # aproximativ 7MB in base64
 
 
+# Raspunsul botului, cu sursele folosite si id-ul conversatiei
 class ChatResponse(BaseModel):
     response: str
     sources: list[str] = []
     conversation_id: str | None = None
 
 
+# Un mesaj dintr-o conversatie, in forma returnata de API
 class MessageResponse(BaseModel):
     id: str
     role: str
@@ -87,6 +100,7 @@ class MessageResponse(BaseModel):
     created_at: str
 
 
+# Un rand din lista de conversatii, cu primul mesaj ca previzualizare
 class ConversationListItem(BaseModel):
     id: str
     session_id: str
@@ -96,6 +110,7 @@ class ConversationListItem(BaseModel):
     first_message: str = ""
 
 
+# Lista paginata de conversatii
 class ConversationListResponse(BaseModel):
     items: list[ConversationListItem]
     total: int
@@ -104,6 +119,7 @@ class ConversationListResponse(BaseModel):
     pages: int
 
 
+# Conversatia completa, cu toate mesajele ei
 class ConversationDetail(BaseModel):
     id: str
     session_id: str
@@ -113,12 +129,14 @@ class ConversationDetail(BaseModel):
     messages: list[MessageResponse] = []
 
 
+# Numarul de conversatii si mesaje dintr-o zi, folosit la graficul de activitate
 class DailyStatItem(BaseModel):
     date: str
     conversations: int
     messages: int
 
 
+# Statisticile afisate pe dashboard
 class StatsResponse(BaseModel):
     total_conversations: int
     total_messages: int
@@ -132,8 +150,9 @@ class StatsResponse(BaseModel):
     rating_distribution: dict = {}
 
 
-# ── Feedback Schemas ──────────────────────────────────────────
+# ── Scheme pentru recenzii ───────────────────────────
 
+# Recenzia trimisa de vizitator din widget
 class FeedbackCreate(BaseModel):
     session_id: str = Field(..., max_length=100)
     bot_id: str = Field(default="bot_123", max_length=50)
@@ -141,6 +160,7 @@ class FeedbackCreate(BaseModel):
     comment: str | None = Field(default=None, max_length=2000)
 
 
+# O recenzie din lista afisata adminilor
 class FeedbackListItem(BaseModel):
     id: str
     rating: int
@@ -150,6 +170,7 @@ class FeedbackListItem(BaseModel):
     first_message: str = ""
 
 
+# Lista paginata de recenzii, cu media si distributia notelor
 class FeedbackListResponse(BaseModel):
     items: list[FeedbackListItem]
     total: int
@@ -161,8 +182,9 @@ class FeedbackListResponse(BaseModel):
     rating_distribution: dict = {}
 
 
-# ── Notification Schemas ──────────────────────────────────────
+# ── Scheme pentru notificari ───────────────────────
 
+# O notificare din lista
 class NotificationItem(BaseModel):
     id: str
     type: str
@@ -173,25 +195,29 @@ class NotificationItem(BaseModel):
     created_at: str
 
 
+# Lista de notificari, cu numarul celor necitite
 class NotificationListResponse(BaseModel):
     items: list[NotificationItem]
     total: int
     unread_count: int
 
 
+# Marcarea ca citita a unei notificari sau a tuturor
 class NotificationMarkRead(BaseModel):
     id: str | None = None
     all: bool = False
 
 
-# ── Bot Schemas ───────────────────────────────────────────────
+# ── Scheme pentru boti ───────────────────────────────────
 
+# Datele necesare pentru crearea unui bot nou
 class BotCreate(BaseModel):
     bot_name: str = Field(default="AI Assistant", max_length=100)
     welcome_message: str = Field(default="Buna! Cu ce te pot ajuta?", max_length=500)
     primary_color: str = Field(default="#6366f1", max_length=20)
 
 
+# Un bot din lista, cu numarul de documente si de conversatii
 class BotListItem(BaseModel):
     bot_id: str
     bot_name: str
@@ -201,29 +227,34 @@ class BotListItem(BaseModel):
     conversation_count: int = 0
 
 
+# Lista de boti ai echipei
 class BotListResponse(BaseModel):
     bots: list[BotListItem]
 
 
-# ── Category Schemas ──────────────────────────────────────────
+# ── Scheme pentru categorii ────────────────────────────
 
+# Crearea unei categorii in baza de cunostinte a unui bot
 class CategoryCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     bot_id: str = Field(default="bot_123", max_length=50)
 
 
+# Redenumirea unei categorii
 class CategoryUpdate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
 
 
+# O categorie, cu numarul de documente din ea
 class CategoryResponse(BaseModel):
     id: str
     name: str
     document_count: int = 0
 
 
-# ── Document Schemas ──────────────────────────────────────────
+# ── Scheme pentru documente ────────────────────────────
 
+# Un document din lista, fara continut
 class DocumentResponse(BaseModel):
     id: str
     filename: str
@@ -233,6 +264,7 @@ class DocumentResponse(BaseModel):
     created_at: str = ""
 
 
+# Un document cu tot continutul lui
 class DocumentDetail(BaseModel):
     id: str
     filename: str
@@ -243,27 +275,30 @@ class DocumentDetail(BaseModel):
     created_at: str = ""
 
 
+# Crearea unui document din text scris direct in panou
 class DocumentCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     content: str = Field(..., min_length=1, max_length=500_000)
     category_id: str = Field(..., max_length=100)
 
 
+# Campurile modificabile ale unui document
 class DocumentUpdate(BaseModel):
     filename: str | None = Field(default=None, max_length=200)
     content: str | None = Field(default=None, max_length=500_000)
     category_id: str | None = Field(default=None, max_length=100)
 
 
+# Raspunsul dupa incarcarea unui fisier
 class UploadResponse(BaseModel):
     document_id: str
     status: str
 
 
-# ── Widget Config Schemas ─────────────────────────────────────
+# ── Scheme pentru configuratia widget-ului ──────────────
 
+# Configuratia publica a widget-ului, fara campurile sensibile ale AI-ului
 class WidgetConfigPublic(BaseModel):
-    """Public widget config - NO sensitive AI fields (system_prompt, temperature, etc.)"""
     welcome_message: str
     bot_name: str
     bot_subtitle: str
@@ -295,8 +330,8 @@ class WidgetConfigPublic(BaseModel):
     language: str = "auto"
 
 
+# Configuratia completa a botului, cu setarile AI, returnata doar adminilor
 class WidgetConfigResponse(WidgetConfigPublic):
-    """Full widget config with AI behavior - ADMIN ONLY"""
     system_prompt: str | None = None
     temperature: float = 0.7
     max_tokens: int = 500
@@ -305,6 +340,7 @@ class WidgetConfigResponse(WidgetConfigPublic):
     allowed_domains: list[str] = []
 
 
+# Campurile de configurare care pot fi modificate; doar cele trimise se actualizeaza
 class WidgetConfigUpdate(BaseModel):
     welcome_message: str | None = Field(default=None, max_length=500)
     bot_name: str | None = Field(default=None, max_length=100)
@@ -334,7 +370,7 @@ class WidgetConfigUpdate(BaseModel):
     bubble_icon: str | None = Field(default=None, max_length=20)
     avatar_size: int | None = Field(default=None, ge=20, le=200)
     quick_replies: str | None = Field(default=None, max_length=5000)
-    # AI Behavior
+    # Setarile de comportament AI
     system_prompt: str | None = Field(default=None, max_length=5000)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, ge=50, le=4096)
@@ -344,8 +380,9 @@ class WidgetConfigUpdate(BaseModel):
     allowed_domains: list[str] | None = None
 
 
-# ── Contact Submission Schemas ───────────────────────────────
+# ── Scheme pentru formularul de contact ─────────────
 
+# Un mesaj din formularul de contact
 class ContactSubmissionOut(BaseModel):
     id: str
     bot_id: str
@@ -358,6 +395,7 @@ class ContactSubmissionOut(BaseModel):
     conversation_id: str | None = None
 
 
+# Lista paginata de mesaje din formularul de contact
 class ContactSubmissionListResponse(BaseModel):
     items: list[ContactSubmissionOut]
     total: int
