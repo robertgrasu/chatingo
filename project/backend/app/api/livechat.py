@@ -1,5 +1,3 @@
-"""REST endpoints for live chat admin management."""
-
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,32 +9,36 @@ from app.models.database import (
 from app.models.schemas import ContactSubmissionListResponse, ContactSubmissionOut
 from app.services.auth import get_current_admin
 from app.services.connection_manager import manager
+from app.services.ownership import ensure_bot_accessible, owned_bot_ids
 
 router = APIRouter(prefix="/admin/livechat")
 
 
+# Conversatiile pentru live chat (in asteptare, live si inchise recent), ale botilor echipei
 @router.get("/conversations")
 async def get_live_conversations(
     db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
-    """Get waiting + live + recently closed conversations."""
-    conversations = (
-        db.query(Conversation)
-        .filter(Conversation.status.in_(["waiting", "live", "closed"]))
-        .order_by(Conversation.last_message_at.desc())
-        .limit(50)
-        .all()
-    )
+    # Doar conversatiile botilor echipei
+    ids = owned_bot_ids(db, admin)
+    # Conversatii in asteptare, live sau inchise
+    query = db.query(Conversation).filter(Conversation.status.in_(["waiting", "live", "closed"]))
+    if ids is not None:
+        query = query.filter(Conversation.bot_id.in_(ids))
+    # Cele mai recente 50 de conversatii
+    conversations = query.order_by(Conversation.last_message_at.desc()).limit(50).all()
 
     items = []
     for conv in conversations:
+        # Primul mesaj al vizitatorului, folosit ca previzualizare
         first_msg = (
             db.query(Message)
             .filter(Message.conversation_id == conv.id, Message.role == "user")
             .order_by(Message.created_at)
             .first()
         )
+        # Datele unei conversatii in forma trimisa panoului
         items.append({
             "id": conv.id,
             "session_id": conv.session_id,
@@ -52,16 +54,17 @@ async def get_live_conversations(
     return {"items": items}
 
 
+# Istoricul complet de mesaje al unei conversatii
 @router.get("/conversations/{conversation_id}/messages")
 async def get_conversation_messages(
     conversation_id: str,
     db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
-    """Get full message history for a conversation."""
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversatie negasita")
+    ensure_bot_accessible(conversation.bot_id, db, admin)
 
     messages = (
         db.query(Message)
@@ -70,6 +73,7 @@ async def get_conversation_messages(
         .all()
     )
 
+    # Operatorul este disponibil daca asa a setat, si conectat daca are un WebSocket deschis
     return {
         "conversation_id": conversation.id,
         "session_id": conversation.session_id,
@@ -89,11 +93,13 @@ async def get_conversation_messages(
     }
 
 
+# Starea operatorului curent: disponibil si conectat prin WebSocket
 @router.get("/operator/status")
 async def get_operator_status(
     db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
+    # Se citeste statusul operatorului curent
     op_status = (
         db.query(OperatorStatus)
         .filter(OperatorStatus.admin_user_id == admin.id)
@@ -105,12 +111,14 @@ async def get_operator_status(
     }
 
 
+# Operatorul se marcheaza ca disponibil sau indisponibil
 @router.put("/operator/status")
 async def update_operator_status(
     data: dict,
     db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
+    # Disponibilitatea ceruta de operator
     is_available = data.get("is_available", False)
 
     op_status = (
@@ -118,10 +126,12 @@ async def update_operator_status(
         .filter(OperatorStatus.admin_user_id == admin.id)
         .first()
     )
+    # Prima data statusul se creeaza
     if not op_status:
         op_status = OperatorStatus(admin_user_id=admin.id)
         db.add(op_status)
 
+    # Se salveaza disponibilitatea si momentul ultimei activitati
     op_status.is_available = is_available
     op_status.last_seen_at = datetime.now(timezone.utc)
     db.commit()
@@ -129,17 +139,18 @@ async def update_operator_status(
     return {"is_available": is_available}
 
 
+# Ultimele 100 de mesaje din formularul de contact
 @router.get("/contacts", response_model=ContactSubmissionListResponse)
 async def get_contact_submissions(
     db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
-    submissions = (
-        db.query(ContactSubmission)
-        .order_by(ContactSubmission.created_at.desc())
-        .limit(100)
-        .all()
-    )
+    # Doar mesajele de contact ale botilor echipei
+    ids = owned_bot_ids(db, admin)
+    query = db.query(ContactSubmission)
+    if ids is not None:
+        query = query.filter(ContactSubmission.bot_id.in_(ids))
+    submissions = query.order_by(ContactSubmission.created_at.desc()).limit(100).all()
 
     return ContactSubmissionListResponse(
         items=[
@@ -160,6 +171,7 @@ async def get_contact_submissions(
     )
 
 
+# Marcheaza un mesaj de contact ca citit
 @router.put("/contacts/{contact_id}/read")
 async def mark_contact_read(
     contact_id: str,
@@ -169,11 +181,13 @@ async def mark_contact_read(
     submission = db.query(ContactSubmission).filter(ContactSubmission.id == contact_id).first()
     if not submission:
         raise HTTPException(status_code=404, detail="Formular negasit")
+    ensure_bot_accessible(submission.bot_id, db, admin)
     submission.status = "read"
     db.commit()
     return {"status": "ok"}
 
 
+# Sterge un mesaj de contact
 @router.delete("/contacts/{contact_id}")
 async def delete_contact(
     contact_id: str,
@@ -183,6 +197,7 @@ async def delete_contact(
     submission = db.query(ContactSubmission).filter(ContactSubmission.id == contact_id).first()
     if not submission:
         raise HTTPException(status_code=404, detail="Formular negasit")
+    ensure_bot_accessible(submission.bot_id, db, admin)
     db.delete(submission)
     db.commit()
     return {"status": "deleted"}
