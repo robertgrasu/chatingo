@@ -1,33 +1,60 @@
 import axios from 'axios';
 
+// Adresa backend-ului, luata din variabila de mediu sau implicit localhost
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+// Clientul HTTP folosit de tot panoul
 const api = axios.create({ baseURL: `${API_URL}/api` });
 
-// Auth token management - set by AuthContext
+// Gestionarea token-ului: functiile sunt setate de AuthContext
 let _getAccessToken = () => null;
 let _refreshAccessToken = () => Promise.resolve(null);
 let _onAuthFailure = () => {};
+let _isDemo = false;
+let _onDemoBlock = null;
 
+// Primeste de la AuthContext functiile pentru token, reinnoire si esec de autentificare
 export function setAuthHelpers(getToken, refreshToken, onFailure) {
   _getAccessToken = getToken;
   _refreshAccessToken = refreshToken;
   _onAuthFailure = onFailure;
 }
 
-// Request interceptor: inject Bearer token
+// Seteaza daca utilizatorul este demo si ce se intampla cand incearca sa scrie
+export function setDemoHelper(isDemo, onBlock) {
+  _isDemo = isDemo;
+  _onDemoBlock = onBlock;
+}
+
+// Verifica daca eroarea vine din blocarea scrierilor pentru contul demo
+export function isDemoError(err) {
+  return !!err?.isDemoBlock;
+}
+
+// Interceptor de cereri: adauga token-ul Bearer si blocheaza scrierile in modul demo
 api.interceptors.request.use((config) => {
   const token = _getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (_isDemo && config.method && config.method.toLowerCase() !== 'get') {
+    if (_onDemoBlock) _onDemoBlock();
+    const err = Object.assign(new Error('Demo block'), {
+      isDemoBlock: true,
+      response: { status: 403, data: { detail: 'Cont demo — modificările nu sunt permise' } },
+      isAxiosError: true,
+    });
+    return Promise.reject(err);
+  }
   return config;
 });
 
-// Response interceptor: handle 401 with token refresh
+// Interceptor de raspunsuri: la 401 se reinnoieste token-ul si cererea se reia
+// Coada cererilor care asteapta reinnoirea token-ului, ca sa nu se faca mai multe reinnoiri deodata
 let isRefreshing = false;
 let failedQueue = [];
 
+// Dupa reinnoire, cererile din coada sunt reluate cu noul token sau respinse
 const processQueue = (token) => {
   failedQueue.forEach(({ resolve, reject, config }) => {
     if (token) {
@@ -43,11 +70,12 @@ const processQueue = (token) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (error.isDemoBlock) return Promise.reject(error);
     const originalRequest = error.config;
 
-    // If 401 and not already retried
+    // Doar daca raspunsul este 401 si cererea nu a mai fost reluata
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Don't retry auth endpoints
+      // Rutele de autentificare nu se reiau
       if (originalRequest.url?.includes('/auth/')) {
         return Promise.reject(error);
       }
@@ -85,12 +113,12 @@ api.interceptors.response.use(
   }
 );
 
-// Bots
+// Boti
 export const getBots = () => api.get('/admin/bots');
 export const createBot = (data) => api.post('/admin/bots', data);
 export const deleteBot = (botId) => api.delete(`/admin/bots/${botId}`);
 
-// Categories
+// Categorii
 export const getCategories = (botId) =>
   api.get('/admin/categories', { params: { bot_id: botId } });
 export const createCategory = (name, botId) =>
@@ -98,7 +126,7 @@ export const createCategory = (name, botId) =>
 export const updateCategory = (id, name) => api.put(`/admin/categories/${id}`, { name });
 export const deleteCategory = (id) => api.delete(`/admin/categories/${id}`);
 
-// Documents
+// Documente
 export const getDocuments = (categoryId, botId) =>
   api.get('/admin/documents', { params: { category_id: categoryId, bot_id: botId } });
 export const getAllDocuments = (botId) =>
@@ -118,7 +146,7 @@ export const uploadDocument = (file, categoryId, botId) => {
 };
 export const deleteDocument = (id) => api.delete(`/admin/documents/${id}`);
 
-// Widget config (admin: full config with AI params, requires auth)
+// Configuratia widget-ului (pentru admin: configuratia completa, cu parametrii AI)
 export const getWidgetConfig = (botId) =>
   api.get(`/widget/config/${botId}/full`);
 export const updateWidgetConfig = (data, botId) =>
@@ -133,7 +161,7 @@ export const uploadAvatar = (file, botId) => {
 export const deleteAvatar = (botId) =>
   api.delete(`/widget/avatar/${botId}`);
 
-// Conversations
+// Conversatii
 export const getConversations = (params = {}) =>
   api.get('/admin/conversations', { params });
 export const getConversation = (id) => api.get(`/admin/conversations/${id}`);
@@ -141,18 +169,18 @@ export const deleteConversation = (id) => api.delete(`/admin/conversations/${id}
 export const deleteAllConversations = (botId) =>
   api.delete('/admin/conversations', { params: { bot_id: botId } });
 
-// Stats
+// Statistici
 export const getStats = (botId) =>
   api.get('/admin/stats', { params: { bot_id: botId } });
 
-// Feedback / Reviews
+// Recenzii
 export const getFeedback = (params = {}) =>
   api.get('/admin/feedback', { params });
 
 export const deleteFeedback = (id) =>
   api.delete(`/admin/feedback/${id}`);
 
-// Notifications
+// Notificari
 export const getNotifications = (params = {}) =>
   api.get('/admin/notifications', { params });
 export const markNotificationsRead = (data, botId) =>
@@ -162,7 +190,7 @@ export const deleteNotification = (id) =>
 export const clearNotifications = (botId) =>
   api.delete('/admin/notifications', { params: { bot_id: botId } });
 
-// Live Chat
+// Live chat
 export const getLiveChatConversations = () =>
   api.get('/admin/livechat/conversations');
 export const getLiveChatMessages = (conversationId) =>
@@ -178,7 +206,7 @@ export const markContactRead = (id) =>
 export const deleteContact = (id) =>
   api.delete(`/admin/livechat/contacts/${id}`);
 
-// User Management
+// Management utilizatori
 export const getUsers = () => api.get('/auth/users');
 export const createUser = (data) => api.post('/auth/users', data);
 export const updateUser = (id, data) => api.put(`/auth/users/${id}`, data);
@@ -186,10 +214,11 @@ export const deleteUser = (id) => api.delete(`/auth/users/${id}`);
 export const resetUserPassword = (id, newPassword) =>
   api.put(`/auth/users/${id}/reset-password`, { new_password: newPassword });
 
-// Profile
+// Profil
 export const updateProfile = (data) => api.put('/auth/profile', data);
 
-// WebSocket for operator live chat
+// WebSocket pentru live chat-ul operatorului
+// Deschide conexiunea WebSocket a operatorului (live chat) si trimite mesajele primite, deja parsate, la onMessage
 export function connectOperatorWs(token, onMessage, onClose) {
   const wsUrl = (API_URL || 'http://localhost:8000').replace(/^http/, 'ws');
   const ws = new WebSocket(`${wsUrl}/ws/operator?token=${token}`);
@@ -207,5 +236,6 @@ export function connectOperatorWs(token, onMessage, onClose) {
   return ws;
 }
 
+// Adresa backend-ului este exportata pentru alte fisiere (de exemplu pentru conexiuni WebSocket)
 export { API_URL };
 export default api;
