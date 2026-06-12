@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getWidgetConfig, updateWidgetConfig } from '../api';
+import { getWidgetConfig, updateWidgetConfig, isDemoError } from '../api';
 import { useToast } from '../ToastContext';
 import { useBot } from '../BotContext';
 
@@ -46,12 +46,16 @@ const TOKEN_PRESETS = [
   { label: 'Max', value: 4000 },
 ];
 
+// Pagina cu comportamentul AI al botului: prompt, stil de raspuns, temperatura, limita de tokeni, numarul de documente folosite si limba
 export default function BotBehavior() {
+  // Botul selectat si mesajele temporare
   const { selectedBotId } = useBot();
   const { addToast } = useToast();
+  // Starea paginii: incarcare si salvare
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Setarile editabile ale comportamentului AI
   const [systemPrompt, setSystemPrompt] = useState('');
   const [responseStyle, setResponseStyle] = useState('balanced');
   const [temperature, setTemperature] = useState(0.7);
@@ -59,6 +63,7 @@ export default function BotBehavior() {
   const [contextDocs, setContextDocs] = useState(3);
   const [language, setLanguage] = useState('auto');
 
+  // La schimbarea botului se incarca setarile lui din configuratie
   useEffect(() => {
     setLoading(true);
     getWidgetConfig(selectedBotId)
@@ -75,11 +80,13 @@ export default function BotBehavior() {
       .finally(() => setLoading(false));
   }, [selectedBotId]);
 
+  // Salveaza setarile de comportament ale botului selectat
   const save = async () => {
     setSaving(true);
     try {
       await updateWidgetConfig(
         {
+          // Promptul implicit nu se salveaza, ca serverul sa foloseasca varianta lui
           system_prompt: systemPrompt === DEFAULT_PROMPT ? '' : systemPrompt,
           response_style: responseStyle,
           temperature,
@@ -90,20 +97,23 @@ export default function BotBehavior() {
         selectedBotId
       );
       addToast('Configurarea a fost salvata!', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la salvare.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  // Eticheta si culoarea afisate langa temperatura, dupa valoarea ei
   const tempLabel = temperature <= 0.3 ? 'Foarte precis' : temperature <= 0.6 ? 'Precis' : temperature <= 1.0 ? 'Echilibrat' : temperature <= 1.5 ? 'Creativ' : 'Foarte creativ';
   const tempBadge = temperature <= 0.5 ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : temperature <= 1.0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400';
 
+  // Cat timp se incarca setarile apar placeholder-e
   if (loading) {
     return (
       <div className="animate-page-enter">
-        <div className="mb-4"><h1 className="text-xl font-bold text-gray-900 dark:text-white">Comportament AI</h1></div>
+        <div className="mb-4"><h1 className="text-xl font-bold text-gray-900 dark:text-white">Comportament Bot</h1></div>
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 h-24 animate-pulse" />
@@ -115,10 +125,10 @@ export default function BotBehavior() {
 
   return (
     <div className="animate-page-enter">
-      {/* Header */}
+      {/* Antet */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Comportament AI</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Comportament Bot</h1>
           <p className="text-xs text-gray-400 mt-0.5">Personalizeaza cum raspunde botul</p>
         </div>
         <button
@@ -126,6 +136,7 @@ export default function BotBehavior() {
           disabled={saving}
           className="px-4 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
         >
+          {/* Indicator de incarcare pe butonul de salvare */}
           {saving && (
             <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -137,7 +148,7 @@ export default function BotBehavior() {
       </div>
 
       <div className="space-y-3">
-        {/* ── System Prompt ── */}
+        {/* ── Promptul de sistem ── */}
         <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Instructiuni Sistem</h3>
@@ -152,19 +163,20 @@ export default function BotBehavior() {
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={6}
-            className="w-full px-3 py-2 rounded-lg border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-dark text-xs text-gray-900 dark:text-white focus:outline-none focus:border-primary/40 transition-colors resize-y font-mono leading-relaxed"
+            className="w-full px-3 py-2 rounded-lg border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-dark text-xs text-gray-900 dark:text-white focus:outline-none focus:border-primary/40 transition-colors resize-y font-mono leading-relaxed min-h-[220px]"
           />
           <p className="text-[10px] text-gray-400 mt-1.5">
             Foloseste <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-primary text-[10px]">{'{context}'}</code> unde vrei contextul din Knowledge Base.
           </p>
         </div>
 
-        {/* ── 2-column grid: Style + Language ── */}
+        {/* ── Grila cu 2 coloane: stil si limba ── */}
         <div className="grid grid-cols-2 gap-3">
-          {/* Style */}
+          {/* Stil */}
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2.5">Stil Raspunsuri</h3>
             <div className="flex gap-2">
+              {/* Cate o optiune pentru fiecare stil de raspuns */}
               {STYLES.map((s) => (
                 <button
                   key={s.key}
@@ -185,7 +197,7 @@ export default function BotBehavior() {
             </div>
           </div>
 
-          {/* Language */}
+          {/* Limba */}
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2.5">Limba Raspunsurilor</h3>
             <select
@@ -194,6 +206,7 @@ export default function BotBehavior() {
               className="w-full px-3 py-2.5 rounded-lg border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-dark text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary/40 transition-colors cursor-pointer appearance-none"
               style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
             >
+              {/* Cate o optiune pentru fiecare limba */}
               {LANGUAGES.map((l) => (
                 <option key={l.key} value={l.key}>{l.label}</option>
               ))}
@@ -204,9 +217,9 @@ export default function BotBehavior() {
           </div>
         </div>
 
-        {/* ── 3-column grid: Temperature + Max Tokens + Context Docs ── */}
+        {/* ── Grila cu 3 coloane: temperatura, limita de tokeni si documente de context ── */}
         <div className="grid grid-cols-3 gap-3">
-          {/* Temperature */}
+          {/* Temperatura */}
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Creativitate</h3>
             <div className="flex items-center gap-2 mb-2">
@@ -224,7 +237,7 @@ export default function BotBehavior() {
             </div>
           </div>
 
-          {/* Max Tokens */}
+          {/* Limita de tokeni */}
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Limita Raspuns</h3>
             <div className="flex items-center gap-2 mb-2">
@@ -232,6 +245,7 @@ export default function BotBehavior() {
               <span className="text-[10px] text-gray-400">tokeni</span>
             </div>
             <div className="flex gap-1 mb-2">
+              {/* Valori predefinite pentru limita de tokeni */}
               {TOKEN_PRESETS.map((p) => (
                 <button
                   key={p.value}
@@ -251,7 +265,7 @@ export default function BotBehavior() {
             />
           </div>
 
-          {/* Context Docs */}
+          {/* Documente de context */}
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Fragmente context</h3>
             <div className="flex items-center gap-2 mb-2">
