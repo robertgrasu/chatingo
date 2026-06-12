@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../ToastContext';
 import { useAuth } from '../AuthContext';
-import { updateProfile } from '../api';
+import { updateProfile, isDemoError } from '../api';
 
+// Sectiune cu titlu, subtitlu si iconita, folosita pentru a grupa campurile paginii
 function Section({ title, subtitle, icon, children }) {
   return (
     <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -24,7 +25,8 @@ function Section({ title, subtitle, icon, children }) {
   );
 }
 
-function InputField({ label, value, onChange, type = 'text', placeholder, disabled, helper }) {
+// Camp de text cu eticheta si text de ajutor, refolosit in formulare
+function InputField({ label, value, onChange, type = 'text', placeholder, disabled, helper, autoComplete = 'off' }) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{label}</label>
@@ -34,6 +36,7 @@ function InputField({ label, value, onChange, type = 'text', placeholder, disabl
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
+        autoComplete={autoComplete}
         className="w-full px-3 py-2 bg-gray-50 dark:bg-dark border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       />
       {helper && <p className="text-[11px] text-gray-400 mt-1">{helper}</p>}
@@ -41,18 +44,23 @@ function InputField({ label, value, onChange, type = 'text', placeholder, disabl
   );
 }
 
+// Pagina contului propriu: schimbarea numelui, a emailului si a parolei
 export default function AccountSettings() {
+  // Mesajele temporare, utilizatorul curent si navigarea
   const { addToast } = useToast();
   const { user, changePassword } = useAuth();
   const navigate = useNavigate();
 
+  // Campurile formularelor de profil si de parola, cu starea salvarii
   const [profileName, setProfileName] = useState(user?.username || '');
   const [profileEmail, setProfileEmail] = useState(user?.email || '');
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
+  // Salveaza numele de utilizator si emailul
   const saveProfile = async () => {
+    // Numele de utilizator nu poate fi gol
     if (!profileName.trim()) {
       addToast('Username-ul nu poate fi gol.', 'error');
       return;
@@ -65,21 +73,31 @@ export default function AccountSettings() {
       });
       addToast('Profil actualizat!', 'success');
     } catch (err) {
+      if (isDemoError(err)) return;
       addToast(err.response?.data?.detail || 'Eroare la salvare.', 'error');
     } finally {
       setSavingProfile(false);
     }
   };
 
+  // Schimba parola contului curent
   const savePassword = async () => {
+    // Contul demo nu poate schimba parola
+    if (user?.role === 'demo') {
+      addToast('Cont demo - modificările nu sunt permise', 'info');
+      return;
+    }
+    // Parola curenta este obligatorie
     if (!passwords.current) {
       addToast('Introdu parola curenta.', 'error');
       return;
     }
+    // Parola noua trebuie sa aiba minim 6 caractere
     if (passwords.newPass.length < 6) {
       addToast('Parola noua trebuie sa aiba minim 6 caractere.', 'error');
       return;
     }
+    // Parola noua trebuie scrisa la fel de doua ori
     if (passwords.newPass !== passwords.confirm) {
       addToast('Parolele nu coincid.', 'error');
       return;
@@ -90,6 +108,7 @@ export default function AccountSettings() {
       addToast('Parola schimbata! Te rugam sa te autentifici din nou.', 'success');
       navigate('/login', { replace: true });
     } catch (err) {
+      if (isDemoError(err)) return;
       addToast(err.response?.data?.detail || 'Eroare la schimbarea parolei.', 'error');
     } finally {
       setSavingPassword(false);
@@ -104,7 +123,7 @@ export default function AccountSettings() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Profile Card */}
+        {/* Coloana din stanga: cardul de profil */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
             <div className="h-24 bg-gradient-to-br from-primary via-primary-600 to-indigo-700 relative">
@@ -164,7 +183,7 @@ export default function AccountSettings() {
           </div>
         </div>
 
-        {/* Right Column - Settings Forms */}
+        {/* Coloana din dreapta: formularele de setari */}
         <div className="lg:col-span-2 space-y-6">
           <Section
             title="Informatii Profil"
@@ -206,6 +225,7 @@ export default function AccountSettings() {
                 disabled={savingProfile}
                 className="px-5 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
               >
+                {/* Indicator de incarcare pe butonul de profil */}
                 {savingProfile && (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -229,6 +249,7 @@ export default function AccountSettings() {
                 value={passwords.current}
                 onChange={(v) => setPasswords((p) => ({ ...p, current: v }))}
                 placeholder="••••••••"
+                autoComplete="current-password"
               />
               <InputField
                 label="Parola Noua"
@@ -236,6 +257,7 @@ export default function AccountSettings() {
                 value={passwords.newPass}
                 onChange={(v) => setPasswords((p) => ({ ...p, newPass: v }))}
                 placeholder="••••••••"
+                autoComplete="new-password"
               />
               <InputField
                 label="Confirma Parola"
@@ -243,6 +265,7 @@ export default function AccountSettings() {
                 value={passwords.confirm}
                 onChange={(v) => setPasswords((p) => ({ ...p, confirm: v }))}
                 placeholder="••••••••"
+                autoComplete="new-password"
               />
             </div>
             <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-lg">
@@ -261,6 +284,7 @@ export default function AccountSettings() {
                 disabled={savingPassword}
                 className="px-5 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
               >
+                {/* Indicator de incarcare pe butonul de parola */}
                 {savingPassword && (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
