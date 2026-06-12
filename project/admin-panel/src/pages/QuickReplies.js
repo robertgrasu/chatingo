@@ -1,22 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { getWidgetConfig, updateWidgetConfig } from '../api';
+import { getWidgetConfig, updateWidgetConfig, isDemoError } from '../api';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../ToastContext';
 import { useBot } from '../BotContext';
 
+// Pagina cu raspunsurile rapide ale widget-ului: lista simpla sau pe categorii cu intrebari
 export default function QuickReplies() {
-  const [mode, setMode] = useState('simple'); // 'simple' or 'categories'
+  const [mode, setMode] = useState('simple'); // simple sau categories
+  // Raspunsurile rapide pentru modul simplu si categoriile pentru modul cu categorii
   const [replies, setReplies] = useState([]);
   const [categories, setCategories] = useState([]);
+  // Starea paginii: incarcare, salvare, configuratia botului si daca functia este activa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState(null);
   const [enabled, setEnabled] = useState(true);
+  // Categoria deschisa in editor si categoria deschisa in previzualizare
   const [expandedCat, setExpandedCat] = useState(null);
   const [previewCat, setPreviewCat] = useState(null);
   const { addToast } = useToast();
   const { selectedBotId } = useBot();
 
+  // La schimbarea botului se incarca raspunsurile rapide; formatul JSON arata modul: lista de texte sau lista de categorii
   useEffect(() => {
     getWidgetConfig(selectedBotId).then((res) => {
       setConfig(res.data);
@@ -43,15 +48,18 @@ export default function QuickReplies() {
     }).finally(() => setLoading(false));
   }, [selectedBotId]);
 
+  // In modul cu categorii prima categorie se deschide automat
   useEffect(() => {
     if (mode === 'categories' && categories.length > 0 && expandedCat === null) {
       setExpandedCat(0);
     }
   }, [categories.length, mode]);
 
+  // Salveaza raspunsurile rapide ca JSON in configuratia botului
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Se salveaza doar elementele care nu sunt goale, in formatul modului ales
       let data;
       if (mode === 'simple') {
         const cleaned = replies.filter((r) => r.trim());
@@ -66,13 +74,15 @@ export default function QuickReplies() {
       }
       await updateWidgetConfig({ quick_replies: data }, selectedBotId);
       addToast('Raspunsurile rapide au fost salvate!', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la salvare.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  // Schimba intre modul simplu si cel cu categorii
   const switchMode = (newMode) => {
     if (newMode === mode) return;
     setMode(newMode);
@@ -81,10 +91,14 @@ export default function QuickReplies() {
     if (newMode === 'categories' && categories.length === 0) setCategories([]);
   };
 
-  // Simple mode handlers
+  // Functii pentru modul simplu
+  // Adauga un raspuns rapid (maxim 8)
   const addReply = () => { if (replies.length < 8) setReplies([...replies, '']); };
+  // Modifica textul unui raspuns rapid
   const updateReply = (i, v) => { const u = [...replies]; u[i] = v; setReplies(u); };
+  // Sterge un raspuns rapid
   const removeReply = (i) => setReplies(replies.filter((_, idx) => idx !== i));
+  // Muta un raspuns rapid in sus sau in jos
   const moveReply = (i, dir) => {
     const n = i + dir;
     if (n < 0 || n >= replies.length) return;
@@ -93,31 +107,40 @@ export default function QuickReplies() {
     setReplies(u);
   };
 
-  // Categories mode handlers
+  // Functii pentru modul cu categorii
+  // Adauga o categorie noua de intrebari
   const addCategory = () => {
+    // Se pot crea cel mult 6 categorii
     if (categories.length >= 6) return;
     const n = [...categories, { name: '', questions: [''] }];
     setCategories(n);
     setExpandedCat(n.length - 1);
   };
+  // Sterge o categorie
   const removeCategory = (idx) => {
     setCategories(categories.filter((_, i) => i !== idx));
     if (expandedCat === idx) setExpandedCat(null);
     else if (expandedCat > idx) setExpandedCat(expandedCat - 1);
   };
+  // Redenumeste o categorie
   const updateCategoryName = (idx, name) => {
     const u = [...categories]; u[idx] = { ...u[idx], name }; setCategories(u);
   };
+  // Adauga o intrebare intr-o categorie
   const addQuestion = (ci) => {
+    // O categorie poate avea cel mult 8 intrebari
     if (categories[ci].questions.length >= 8) return;
     const u = [...categories]; u[ci] = { ...u[ci], questions: [...u[ci].questions, ''] }; setCategories(u);
   };
+  // Modifica textul unei intrebari
   const updateQuestion = (ci, qi, v) => {
     const u = [...categories]; const q = [...u[ci].questions]; q[qi] = v; u[ci] = { ...u[ci], questions: q }; setCategories(u);
   };
+  // Sterge o intrebare dintr-o categorie
   const removeQuestion = (ci, qi) => {
     const u = [...categories]; u[ci] = { ...u[ci], questions: u[ci].questions.filter((_, i) => i !== qi) }; setCategories(u);
   };
+  // Muta o categorie in sus sau in jos
   const moveCategory = (idx, dir) => {
     const n = idx + dir;
     if (n < 0 || n >= categories.length) return;
@@ -127,23 +150,28 @@ export default function QuickReplies() {
     setExpandedCat(n);
   };
 
+  // Activeaza sau dezactiveaza raspunsurile rapide din widget
   const handleToggle = async () => {
     const next = !enabled;
     setEnabled(next);
     try {
       await updateWidgetConfig({ enable_quick_replies: next }, selectedBotId);
       addToast(next ? 'Raspunsuri rapide activate' : 'Raspunsuri rapide dezactivate', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) { setEnabled(!next); return; }
       setEnabled(!next);
       addToast('Eroare la salvare.', 'error');
     }
   };
 
+  // Culoarea principala a botului, folosita in previzualizare
   const primaryColor = config?.primary_color || '#6366f1';
 
+  // Stilul butoanelor din previzualizare, preluat din culoarea botului
   const pillStyle = (clr) => ({
     borderColor: clr, color: clr,
   });
+  // La trecerea mouse-ului butonul se umple cu culoarea botului
   const onHover = (e, clr) => { e.currentTarget.style.background = clr; e.currentTarget.style.color = '#fff'; };
   const onLeave = (e, clr) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = clr; };
 
@@ -165,6 +193,7 @@ export default function QuickReplies() {
             <div className="w-px h-6 bg-gray-200 dark:bg-gray-700" />
             <button onClick={handleSave} disabled={saving || !enabled}
               className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-600 disabled:opacity-50 font-medium text-sm transition-colors">
+              {/* Indicator de incarcare pe butonul de salvare */}
               {saving ? (
                 <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Se salveaza...</>
               ) : (
@@ -177,7 +206,7 @@ export default function QuickReplies() {
 
       <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 ${!enabled ? 'opacity-50 pointer-events-none select-none' : ''}`}>
         <div className="lg:col-span-2 space-y-4">
-          {/* Info card */}
+          {/* Card informativ */}
           <div className="bg-primary/5 border-2 border-primary/10 rounded-xl p-4 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
               <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -194,7 +223,7 @@ export default function QuickReplies() {
             </div>
           </div>
 
-          {/* Mode toggle */}
+          {/* Comutatorul dintre moduri */}
           <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl p-3 flex gap-2">
             <button
               onClick={() => switchMode('simple')}
@@ -216,7 +245,7 @@ export default function QuickReplies() {
             </button>
           </div>
 
-          {/* SIMPLE MODE */}
+          {/* Editorul pentru modul simplu */}
           {mode === 'simple' && (
             <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -232,6 +261,7 @@ export default function QuickReplies() {
                 )}
               </div>
 
+              {/* Cat timp se incarca apar placeholder-e, apoi lista de raspunsuri */}
               {loading ? (
                 <div className="p-5 space-y-3">{[1,2,3].map((i) => <div key={i} className="h-12 bg-gray-100 dark:bg-gray-700 rounded-lg animate-pulse" />)}</div>
               ) : replies.length === 0 ? (
@@ -248,6 +278,7 @@ export default function QuickReplies() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {/* Fiecare raspuns rapid, cu butoane de mutare si stergere */}
                   {replies.map((reply, i) => (
                     <div key={i} className="flex items-center gap-3 px-5 py-3 group hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                       <span className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-400 flex-shrink-0">{i + 1}</span>
@@ -277,7 +308,7 @@ export default function QuickReplies() {
             </div>
           )}
 
-          {/* CATEGORIES MODE */}
+          {/* Editorul pentru modul cu categorii */}
           {mode === 'categories' && (
             <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -309,6 +340,7 @@ export default function QuickReplies() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {/* Fiecare categorie, cu intrebarile ei */}
                   {categories.map((cat, catIdx) => (
                     <div key={catIdx}>
                       <div className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors group"
@@ -362,7 +394,7 @@ export default function QuickReplies() {
           )}
         </div>
 
-        {/* Right: Preview */}
+        {/* Dreapta: previzualizarea */}
         <div>
           <div className="sticky top-8">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2 text-sm">
@@ -392,9 +424,10 @@ export default function QuickReplies() {
                   </div>
                 </div>
 
-                {/* Simple preview */}
+                {/* Previzualizare pentru modul simplu */}
                 {mode === 'simple' && replies.filter((r) => r.trim()).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
+                    {/* Previzualizarea modului simplu */}
                     {replies.filter((r) => r.trim()).map((r, i) => (
                       <span key={i} className="text-[11px] px-3 py-1.5 rounded-full border-[1.5px] font-medium cursor-default transition-colors"
                         style={pillStyle(primaryColor)} onMouseEnter={(e) => onHover(e, primaryColor)} onMouseLeave={(e) => onLeave(e, primaryColor)}>
@@ -404,9 +437,10 @@ export default function QuickReplies() {
                   </div>
                 )}
 
-                {/* Categories preview */}
+                {/* Previzualizare pentru modul cu categorii */}
                 {mode === 'categories' && categories.filter((c) => c.name.trim()).length > 0 && (
                   <div className="mt-3">
+                    {/* Previzualizarea arata categoriile, iar dupa alegere intrebarile categoriei */}
                     {previewCat === null ? (
                       <div className="flex flex-wrap gap-1.5">
                         {categories.filter((c) => c.name.trim()).map((c, i) => (
