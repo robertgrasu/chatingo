@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from './ThemeContext';
-import { ToastProvider } from './ToastContext';
+import { ToastProvider, useToast } from './ToastContext';
 import { BotProvider } from './BotContext';
 import { AuthProvider, useAuth } from './AuthContext';
 import { NotificationProvider } from './NotificationContext';
-import { setAuthHelpers } from './api';
+import { setAuthHelpers, setDemoHelper } from './api';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Dashboard from './pages/Dashboard';
@@ -23,6 +23,7 @@ import LiveChat from './pages/LiveChat';
 import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 
+// Permite accesul doar utilizatorilor autentificati; ceilalti sunt trimisi la pagina de login
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return (
@@ -33,10 +34,13 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
+// Leaga contextul de autentificare de clientul API: token-ul, reinnoirea lui, deconectarea la esec si blocarea scrierilor pentru contul demo
 function AuthWiring({ children }) {
-  const { accessToken, refreshAccessToken, logout } = useAuth();
+  const { accessToken, refreshAccessToken, logout, user } = useAuth();
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
+  // Functiile pasate clientului API pentru token si pentru cazul in care autentificarea esueaza definitiv
   const getToken = useCallback(() => accessToken, [accessToken]);
   const onFailure = useCallback(() => {
     logout();
@@ -47,9 +51,16 @@ function AuthWiring({ children }) {
     setAuthHelpers(getToken, refreshAccessToken, onFailure);
   }, [getToken, refreshAccessToken, onFailure]);
 
+  useEffect(() => {
+    // Contul demo poate doar citi, iar la orice incercare de scriere se afiseaza un mesaj
+    const isDemo = user?.role === 'demo';
+    setDemoHelper(isDemo, isDemo ? () => addToast('Cont demo - modificările nu sunt permise', 'info') : null);
+  }, [user, addToast]);
+
   return children;
 }
 
+// Structura paginilor din panou: bara laterala, bara de sus si zona cu rutele protejate
 function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -86,6 +97,7 @@ function AppLayout() {
   );
 }
 
+// Componenta radacina: furnizorii de context si rutele aplicatiei
 export default function App() {
   return (
     <ThemeProvider>
