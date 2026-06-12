@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getFeedback, deleteFeedback, getConversation, getWidgetConfig, updateWidgetConfig } from '../api';
+import { getFeedback, deleteFeedback, getConversation, getWidgetConfig, updateWidgetConfig, isDemoError } from '../api';
 import { useBot } from '../BotContext';
 import { useToast } from '../ToastContext';
 import PageHeader from '../components/PageHeader';
 import { MessageSkeleton } from '../components/Skeleton';
 import { timeAgo, formatDateTime, formatTime } from '../utils';
 
+// Optiunile de sortare ale recenziilor
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Cele mai noi' },
   { value: 'oldest', label: 'Cele mai vechi' },
@@ -13,9 +14,11 @@ const SORT_OPTIONS = [
   { value: 'lowest', label: 'Rating minim' },
 ];
 
+// Afiseaza nota ca stele pline si goale
 function Stars({ rating, size = 'w-3.5 h-3.5' }) {
   return (
     <div className="flex items-center gap-0.5">
+      {/* Cate o stea pentru fiecare nota, plina daca este sub nota data */}
       {[1, 2, 3, 4, 5].map((s) => (
         <svg key={s} className={`${size} ${s <= rating ? 'text-amber-400' : 'text-gray-200 dark:text-gray-700'}`} fill="currentColor" viewBox="0 0 24 24">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -25,40 +28,47 @@ function Stars({ rating, size = 'w-3.5 h-3.5' }) {
   );
 }
 
+// Pagina cu recenziile vizitatorilor: media notelor, distributia, lista paginata si conversatia asociata fiecarei recenzii
 export default function Reviews() {
   const { selectedBotId } = useBot();
   const { addToast } = useToast();
+  // Raspunsul API (recenzii si statistici), incarcarea si daca recenziile sunt active in widget
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(true);
+  // Paginarea, sortarea si filtrul dupa nota
   const [page, setPage] = useState(1);
   const [perPage] = useState(15);
   const [sortBy, setSortBy] = useState('newest');
   const [ratingFilter, setRatingFilter] = useState(null);
 
-  // Conversation detail
+  // Detaliile conversatiei
   const [selectedFb, setSelectedFb] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Se citeste din configuratie daca recenziile sunt active
   useEffect(() => {
     getWidgetConfig(selectedBotId).then((res) => {
       setEnabled(res.data.enable_reviews !== false);
     }).catch(() => {});
   }, [selectedBotId]);
 
+  // Activeaza sau dezactiveaza recenziile din widget
   const handleToggle = async () => {
     const next = !enabled;
     setEnabled(next);
     try {
       await updateWidgetConfig({ enable_reviews: next }, selectedBotId);
       addToast(next ? 'Recenzii activate' : 'Recenzii dezactivate', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) { setEnabled(!next); return; }
       setEnabled(!next);
       addToast('Eroare la salvare.', 'error');
     }
   };
 
+  // Incarca pagina curenta de recenzii
   const loadFeedback = useCallback(() => {
     setLoading(true);
     const params = { page, per_page: perPage, sort: sortBy, bot_id: selectedBotId };
@@ -70,6 +80,7 @@ export default function Reviews() {
 
   useEffect(() => { loadFeedback(); }, [loadFeedback]);
 
+  // Deschide conversatia legata de o recenzie
   const handleViewConversation = (fb) => {
     setSelectedFb(fb);
     setDetail(null);
@@ -80,6 +91,7 @@ export default function Reviews() {
       .finally(() => setLoadingDetail(false));
   };
 
+  // Sterge o recenzie
   const handleDeleteFeedback = async (fbId) => {
     try {
       await deleteFeedback(fbId);
@@ -89,15 +101,19 @@ export default function Reviews() {
         setDetail(null);
       }
       loadFeedback();
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la stergere', 'error');
     }
   };
 
+  // Statisticile afisate in carduri
   const avgRating = data?.average_rating || 0;
   const totalRatings = data?.total_ratings || 0;
   const distribution = data?.rating_distribution || {};
+  // Clientii multumiti sunt cei care au dat nota 4 sau 5
   const satisfied = ((distribution['4'] || 0) + (distribution['5'] || 0));
+  // Procentul clientilor multumiti din totalul notelor
   const satisfactionPct = totalRatings > 0 ? Math.round((satisfied / totalRatings) * 100) : 0;
 
   return (
@@ -129,7 +145,7 @@ export default function Reviews() {
           ))}
         </div>
       ) : totalRatings === 0 ? (
-        /* Empty state */
+        /* Starea goala, cand nu exista recenzii */
         <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl">
           <div className="text-center py-20">
             <div className="w-16 h-16 bg-amber-50 dark:bg-amber-500/10 rounded-2xl mx-auto mb-4 flex items-center justify-center">
@@ -145,7 +161,7 @@ export default function Reviews() {
         </div>
       ) : (
         <>
-          {/* Stats cards */}
+          {/* Cardurile cu statistici */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
             <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl p-5">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Rating Mediu</p>
@@ -171,24 +187,25 @@ export default function Reviews() {
             </div>
           </div>
 
-          {/* Individual Reviews: List + Detail */}
+          {/* Recenziile individuale: lista si detaliile */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5" style={{ height: 'calc(100vh - 340px)', minHeight: '400px' }}>
-            {/* Left: Reviews List */}
+            {/* Stanga: lista de recenzii */}
             <div className="bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden flex flex-col">
-              {/* Controls */}
+              {/* Controale */}
               <div className="p-4 border-b border-gray-100 dark:border-gray-800 space-y-3 flex-shrink-0">
-                {/* Sort */}
+                {/* Sortare */}
                 <select
                   value={sortBy}
                   onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
                   className="w-full text-xs bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors text-gray-700 dark:text-gray-300"
                 >
+                  {/* Cate o optiune pentru fiecare tip de sortare */}
                   {SORT_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
 
-                {/* Rating filter pills */}
+                {/* Butoanele de filtrare dupa nota */}
                 <div className="flex items-center gap-1 flex-wrap">
                   <button
                     onClick={() => { setRatingFilter(null); setPage(1); }}
@@ -200,6 +217,7 @@ export default function Reviews() {
                   >
                     Toate
                   </button>
+                  {/* Cate un buton de filtrare pentru fiecare nota */}
                   {[5, 4, 3, 2, 1].map((r) => (
                     <button
                       key={r}
@@ -219,8 +237,9 @@ export default function Reviews() {
                 </div>
               </div>
 
-              {/* List */}
+              {/* Lista */}
               <div className="flex-1 overflow-y-auto min-h-0">
+                {/* Cat timp se incarca apar placeholder-e, apoi lista de recenzii */}
                 {loading ? (
                   <div className="p-4 space-y-3">
                     {[1, 2, 3, 4].map((i) => (
@@ -261,6 +280,7 @@ export default function Reviews() {
                           </button>
                         </div>
                       </div>
+                      {/* Comentariul apare doar daca vizitatorul a scris unul */}
                       {fb.comment && (
                         <p className="text-sm text-gray-900 dark:text-white mb-1 line-clamp-2 leading-snug">
                           &ldquo;{fb.comment}&rdquo;
@@ -278,7 +298,7 @@ export default function Reviews() {
                 )}
               </div>
 
-              {/* Pagination */}
+              {/* Paginare */}
               {data && data.pages > 1 && (
                 <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
                   <span className="text-[11px] text-gray-400">{data.total} recenzii</span>
@@ -309,8 +329,9 @@ export default function Reviews() {
               )}
             </div>
 
-            {/* Right: Conversation Detail */}
+            {/* Dreapta: detaliile conversatiei */}
             <div className="col-span-2 bg-white dark:bg-dark-light border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden flex flex-col">
+              {/* Daca nu e aleasa nicio recenzie apare un mesaj, altfel conversatia ei */}
               {!selectedFb ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                   <svg className="w-16 h-16 mb-3 text-amber-200 dark:text-amber-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -328,7 +349,7 @@ export default function Reviews() {
                 </div>
               ) : !selectedFb.conversation_id ? (
                 <div className="flex-1 flex flex-col">
-                  {/* Header */}
+                  {/* Antet */}
                   <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                     <div className="flex items-center gap-3">
                       <Stars rating={selectedFb.rating} size="w-4 h-4" />
@@ -343,12 +364,12 @@ export default function Reviews() {
                       </svg>
                     </button>
                   </div>
-                  {/* No conversation */}
+                  {/* Recenzie fara conversatie */}
                   <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                     <p className="text-sm">Conversatia nu mai exista</p>
                     <p className="text-xs mt-1">Feedback-ul a fost trimis fara o conversatie asociata</p>
                   </div>
-                  {/* Comment footer */}
+                  {/* Subsolul cu comentariul */}
                   {selectedFb.comment && (
                     <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-amber-50/50 dark:bg-amber-500/5 flex-shrink-0">
                       <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">Comentariu</p>
@@ -358,7 +379,7 @@ export default function Reviews() {
                 </div>
               ) : detail && (
                 <div className="flex-1 flex flex-col min-h-0">
-                  {/* Header */}
+                  {/* Antet */}
                   <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                     <div>
                       <div className="flex items-center gap-3 mb-0.5">
@@ -379,8 +400,9 @@ export default function Reviews() {
                     </button>
                   </div>
 
-                  {/* Messages */}
+                  {/* Mesaje */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+                    {/* Fiecare mesaj al conversatiei recenziei */}
                     {detail.messages.map((msg) => (
                       <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div
@@ -409,7 +431,7 @@ export default function Reviews() {
                     ))}
                   </div>
 
-                  {/* Feedback comment footer */}
+                  {/* Subsolul cu comentariul recenziei */}
                   {selectedFb.comment && (
                     <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-amber-50/50 dark:bg-amber-500/5 flex-shrink-0">
                       <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">Comentariu feedback</p>
