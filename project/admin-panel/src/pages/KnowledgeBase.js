@@ -12,6 +12,7 @@ import {
   updateCategory,
   updateDocument,
   uploadDocument,
+  isDemoError,
 } from '../api';
 import PageHeader from '../components/PageHeader';
 import ConfirmModal from '../components/ConfirmModal';
@@ -19,15 +20,19 @@ import { useToast } from '../ToastContext';
 import { useBot } from '../BotContext';
 import { formatDate } from '../utils';
 
+// Eticheta si culorile pentru fiecare stare a unui document: ready, processing si error
 const statusConfig = {
   ready: { label: 'Activ', color: 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
   processing: { label: 'Se proceseaza', color: 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400', dot: 'bg-amber-500 animate-pulse' },
   error: { label: 'Eroare', color: 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400', dot: 'bg-red-500' },
 };
 
+// Pagina bazei de cunostinte: categorii si documente (fisiere sau text) din care botul isi ia raspunsurile
 export default function KnowledgeBase() {
+  // Mesajele temporare si botul selectat
   const { addToast } = useToast();
   const { selectedBotId } = useBot();
+  // Categoriile, categoria aleasa (all inseamna toate), documentele, cautarea si incarcarea initiala
   const [categories, setCategories] = useState([]);
   const [selectedCat, setSelectedCat] = useState('all');
   const [documents, setDocuments] = useState([]);
@@ -35,28 +40,28 @@ export default function KnowledgeBase() {
   const [searchQuery, setSearchQuery] = useState('');
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Inline rename
+  // Redenumirea categoriei direct in lista
   const [editingCatId, setEditingCatId] = useState(null);
   const [editingCatName, setEditingCatName] = useState('');
 
-  // Add content tabs
+  // Taburile pentru adaugarea de continut
   const [addTab, setAddTab] = useState('upload');
   const [showAddPanel, setShowAddPanel] = useState(false);
 
-  // Upload state
+  // Starea incarcarii unui fisier
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadCatId, setUploadCatId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Text create state
+  // Starea creerii unui document din text
   const [textTitle, setTextTitle] = useState('');
   const [textContent, setTextContent] = useState('');
   const [textCatId, setTextCatId] = useState('');
   const [creating, setCreating] = useState(false);
 
-  // Document editor modal
+  // Fereastra de editare a documentului
   const [editDoc, setEditDoc] = useState(null);
   const [editFilename, setEditFilename] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -64,17 +69,19 @@ export default function KnowledgeBase() {
   const [saving, setSaving] = useState(false);
   const [loadingDoc, setLoadingDoc] = useState(false);
 
-  // Confirm modal
+  // Fereastra de confirmare
   const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: () => {} });
 
-  // Error
+  // Eroare
   const [error, setError] = useState('');
 
+  // Incarca categoriile botului selectat
   const loadCategories = useCallback(async () => {
     const res = await getCategories(selectedBotId);
     setCategories(res.data);
   }, [selectedBotId]);
 
+  // Incarca documentele categoriei alese
   const loadDocuments = useCallback(async (catId) => {
     try {
       if (catId === 'all') {
@@ -89,17 +96,22 @@ export default function KnowledgeBase() {
     }
   }, []);
 
+  // Categoriile se incarca la pornire si cand se schimba botul
   useEffect(() => { loadCategories(); }, [loadCategories]);
+  // Documentele se reincarca cand se schimba categoria aleasa
   useEffect(() => { loadDocuments(selectedCat); }, [selectedCat, loadDocuments]);
 
+  // Reincarca categoriile si documentele dupa o modificare
   const refresh = () => {
     loadCategories();
     loadDocuments(selectedCat);
   };
 
-  // --- Category handlers ---
+  // --- Functii pentru categorii ---
+  // Creeaza o categorie noua
   const handleCreateCategory = async (e) => {
     e.preventDefault();
+    // Numele categoriei este obligatoriu
     if (!newCatName.trim()) return;
     await createCategory(newCatName.trim());
     setNewCatName('');
@@ -107,6 +119,7 @@ export default function KnowledgeBase() {
     addToast('Categorie creata cu succes!', 'success');
   };
 
+  // Redenumeste o categorie
   const handleRenameCategory = async (id) => {
     if (!editingCatName.trim()) { setEditingCatId(null); return; }
     await updateCategory(id, editingCatName.trim());
@@ -115,21 +128,25 @@ export default function KnowledgeBase() {
     addToast('Categorie redenumita.', 'success');
   };
 
+  // Sterge o categorie impreuna cu documentele ei, dupa confirmare
   const handleDeleteCategory = (id) => {
     setConfirmModal({
       open: true,
       title: 'Sterge categoria',
       message: 'Sigur vrei sa stergi aceasta categorie si toate documentele asociate? Aceasta actiune nu poate fi anulata.',
       onConfirm: async () => {
-        await deleteCategory(id);
-        if (selectedCat === id) setSelectedCat('all');
-        refresh();
-        addToast('Categorie stearsa.', 'success');
+        try {
+          await deleteCategory(id);
+          if (selectedCat === id) setSelectedCat('all');
+          refresh();
+          addToast('Categorie stearsa.', 'success');
+        } catch (err) { if (!isDemoError(err)) addToast('Eroare la stergere.', 'error'); }
       },
     });
   };
 
-  // --- Upload handler ---
+  // --- Functia de incarcare ---
+  // Retine fisierul ales pentru incarcare
   const handleFileSelect = (f) => {
     const allowed = ['.txt', '.pdf', '.docx'];
     if (f && !allowed.some(ext => f.name.toLowerCase().endsWith(ext))) {
@@ -140,6 +157,7 @@ export default function KnowledgeBase() {
     setError('');
   };
 
+  // Incarca fisierul ales in categoria selectata
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!uploadFile || !uploadCatId) { setError('Selecteaza o categorie si un fisier.'); return; }
@@ -152,14 +170,16 @@ export default function KnowledgeBase() {
       setShowAddPanel(false);
       refresh();
       addToast('Document uploadat cu succes!', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la upload. Incearca din nou.', 'error');
     } finally {
       setUploading(false);
     }
   };
 
-  // --- Text create handler ---
+  // --- Functia de creare din text ---
+  // Creeaza un document din text scris direct in panou
   const handleCreateText = async (e) => {
     e.preventDefault();
     if (!textTitle.trim() || !textContent.trim() || !textCatId) {
@@ -175,14 +195,16 @@ export default function KnowledgeBase() {
       setShowAddPanel(false);
       refresh();
       addToast('Document creat cu succes!', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la creare. Incearca din nou.', 'error');
     } finally {
       setCreating(false);
     }
   };
 
-  // --- Document handlers ---
+  // --- Functii pentru documente ---
+  // Incarca continutul unui document pentru vizualizare si editare
   const handleOpenDocument = async (docId) => {
     setLoadingDoc(true);
     try {
@@ -199,6 +221,7 @@ export default function KnowledgeBase() {
     }
   };
 
+  // Salveaza modificarile documentului
   const handleSaveDocument = async () => {
     if (!editDoc) return;
     setSaving(true);
@@ -214,45 +237,53 @@ export default function KnowledgeBase() {
       setEditDoc(null);
       refresh();
       addToast('Document salvat cu succes!', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la salvare.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  // Sterge un document dupa confirmare
   const handleDeleteDocument = (id) => {
     setConfirmModal({
       open: true,
       title: 'Sterge documentul',
       message: 'Sigur vrei sa stergi acest document? Aceasta actiune nu poate fi anulata.',
       onConfirm: async () => {
-        await deleteDocument(id);
-        if (editDoc?.id === id) setEditDoc(null);
-        refresh();
-        addToast('Document sters.', 'success');
+        try {
+          await deleteDocument(id);
+          if (editDoc?.id === id) setEditDoc(null);
+          refresh();
+          addToast('Document sters.', 'success');
+        } catch (err) { if (!isDemoError(err)) addToast('Eroare la stergere.', 'error'); }
       },
     });
   };
 
+  // Returneaza numele categoriei dupa id
   const getCategoryName = (catId) => {
     const cat = categories.find((c) => c.id === catId);
     return cat ? cat.name : '';
   };
 
+  // Numarul total de documente, adunat din toate categoriile
   const totalDocs = categories.reduce((sum, c) => sum + c.document_count, 0);
 
+  // Documentele filtrate dupa textul din cautare
   const filteredDocs = searchQuery
     ? documents.filter((d) => d.filename.toLowerCase().includes(searchQuery.toLowerCase()))
     : documents;
 
+  // Clasele comune ale campurilor din formulare
   const inputClass = 'w-full border border-gray-200 dark:border-gray-600 rounded-xl px-3.5 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all';
 
   return (
     <div className="animate-page-enter">
       <PageHeader
-        title="Knowledge Base"
-        subtitle="Gestioneaza categoriile si documentele pentru chatbot."
+        title="Bază de Cunoștințe"
+        subtitle="Gestionează informațiile pe care botul le folosește când răspunde."
         action={
           <button
             onClick={() => { setShowAddPanel(!showAddPanel); setError(''); }}
@@ -266,10 +297,10 @@ export default function KnowledgeBase() {
         }
       />
 
-      {/* Add Content Panel */}
+      {/* Panoul pentru adaugarea de continut, vizibil doar cand este deschis */}
       {showAddPanel && (
         <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-6 mb-6 shadow-sm animate-scale-in">
-          {/* Tabs */}
+          {/* Taburi */}
           <div className="flex gap-1 mb-5 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 w-fit">
             <button
               onClick={() => { setAddTab('upload'); setError(''); }}
@@ -299,7 +330,7 @@ export default function KnowledgeBase() {
             </button>
           </div>
 
-          {/* Upload Tab */}
+          {/* Tabul de incarcare: alegerea categoriei si a fisierului */}
           {addTab === 'upload' && (
             <form onSubmit={handleUpload}>
               <div className="grid grid-cols-2 gap-4 mb-4">
@@ -307,6 +338,7 @@ export default function KnowledgeBase() {
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Categorie</label>
                   <select value={uploadCatId} onChange={(e) => setUploadCatId(e.target.value)} className={inputClass}>
                     <option value="">Selecteaza categorie...</option>
+                    {/* Cate o optiune pentru fiecare categorie */}
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
@@ -326,6 +358,7 @@ export default function KnowledgeBase() {
                     }`}
                   >
                     <input ref={fileInputRef} type="file" accept=".txt,.pdf,.docx" onChange={(e) => handleFileSelect(e.target.files[0])} className="hidden" />
+                    {/* Fisierul ales este afisat cu numele lui, altfel zona de drag and drop */}
                     {uploadFile ? (
                       <span className="text-sm text-emerald-700 dark:text-emerald-400 truncate">{uploadFile.name}</span>
                     ) : (
@@ -339,6 +372,7 @@ export default function KnowledgeBase() {
                 disabled={uploading || !uploadFile || !uploadCatId}
                 className="bg-gradient-to-r from-primary to-primary-600 text-white px-6 py-2.5 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium shadow-lg shadow-primary/20 transition-all"
               >
+                {/* In timpul incarcarii butonul arata un indicator */}
                 {uploading ? (
                   <span className="flex items-center gap-2">
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -349,7 +383,7 @@ export default function KnowledgeBase() {
             </form>
           )}
 
-          {/* Text Tab */}
+          {/* Tabul de text: titlu, categorie si continut */}
           {addTab === 'text' && (
             <form onSubmit={handleCreateText}>
               <div className="grid grid-cols-2 gap-4 mb-4">
@@ -376,6 +410,7 @@ export default function KnowledgeBase() {
                 disabled={creating || !textTitle.trim() || !textContent.trim() || !textCatId}
                 className="bg-gradient-to-r from-primary to-primary-600 text-white px-6 py-2.5 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium shadow-lg shadow-primary/20 transition-all"
               >
+                {/* In timpul crearii butonul arata un indicator */}
                 {creating ? (
                   <span className="flex items-center gap-2">
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -386,6 +421,7 @@ export default function KnowledgeBase() {
             </form>
           )}
 
+          {/* Mesajul de eroare apare doar cand exista o eroare */}
           {error && (
             <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm mt-4 bg-red-50 dark:bg-red-500/10 px-3 py-2 rounded-lg">
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -398,7 +434,7 @@ export default function KnowledgeBase() {
       )}
 
       <div className="grid grid-cols-12 gap-6">
-        {/* Sidebar - Categories */}
+        {/* Coloana laterala cu categoriile */}
         <div className="col-span-3">
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 p-5 sticky top-8">
             <div className="flex items-center justify-between mb-4">
@@ -503,6 +539,7 @@ export default function KnowledgeBase() {
                 </li>
               ))}
 
+              {/* Mesaj afisat cand nu exista nicio categorie */}
               {categories.length === 0 && (
                 <li className="text-center py-8">
                   <svg className="w-10 h-10 text-gray-200 dark:text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -516,10 +553,10 @@ export default function KnowledgeBase() {
           </div>
         </div>
 
-        {/* Main - Documents */}
+        {/* Zona principala cu documentele */}
         <div className="col-span-9">
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
-            {/* Header */}
+            {/* Antet */}
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -541,6 +578,7 @@ export default function KnowledgeBase() {
               </div>
             </div>
 
+            {/* Cat timp se incarca apar placeholder-e, apoi lista de documente */}
             {initialLoading ? (
               <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
                 {[0, 1, 2].map((i) => (
@@ -568,6 +606,7 @@ export default function KnowledgeBase() {
               </div>
             ) : (
               <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                {/* Fiecare document, cu starea, data si actiunile lui */}
                 {filteredDocs.map((doc) => {
                   const status = statusConfig[doc.status] || statusConfig.error;
                   return (
@@ -576,7 +615,7 @@ export default function KnowledgeBase() {
                       className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50/80 dark:hover:bg-gray-700/30 transition-colors cursor-pointer group"
                       onClick={() => handleOpenDocument(doc.id)}
                     >
-                      {/* Doc icon */}
+                      {/* Iconita documentului */}
                       <div className="w-9 h-9 bg-primary/8 dark:bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                         <svg className="w-4.5 h-4.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
@@ -586,7 +625,7 @@ export default function KnowledgeBase() {
                         </svg>
                       </div>
 
-                      {/* Title + category */}
+                      {/* Titlul si categoria */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{doc.filename}</p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -602,13 +641,13 @@ export default function KnowledgeBase() {
                         </div>
                       </div>
 
-                      {/* Status */}
+                      {/* Starea */}
                       <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full flex-shrink-0 ml-auto group-hover:hidden ${status.color}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
                         {status.label}
                       </span>
 
-                      {/* Actions */}
+                      {/* Actiuni */}
                       <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0 ml-auto">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleOpenDocument(doc.id); }}
@@ -638,13 +677,14 @@ export default function KnowledgeBase() {
         </div>
       </div>
 
-      {/* Document Editor Modal */}
+      {/* Fereastra de editare este desenata in body si apare cat timp se incarca sau se editeaza un document */}
       {(editDoc || loadingDoc) && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => !saving && setEditDoc(null)}>
           <div
             className="bg-white dark:bg-dark-light rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-scale-in border-2 border-gray-100 dark:border-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Indicator de incarcare pana cand documentul este adus de pe server */}
             {loadingDoc && !editDoc ? (
               <div className="flex items-center justify-center py-20">
                 <svg className="animate-spin w-8 h-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
@@ -654,7 +694,7 @@ export default function KnowledgeBase() {
               </div>
             ) : editDoc && (
               <>
-                {/* Modal header */}
+                {/* Antetul ferestrei */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary/10 dark:bg-primary/10 rounded-xl flex items-center justify-center">
@@ -690,7 +730,7 @@ export default function KnowledgeBase() {
                   </button>
                 </div>
 
-                {/* Modal body */}
+                {/* Corpul ferestrei */}
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -720,7 +760,7 @@ export default function KnowledgeBase() {
                   )}
                 </div>
 
-                {/* Modal footer */}
+                {/* Subsolul ferestrei */}
                 <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 rounded-b-2xl">
                   <button
                     onClick={() => handleDeleteDocument(editDoc.id)}
@@ -743,6 +783,7 @@ export default function KnowledgeBase() {
                       disabled={saving}
                       className="bg-gradient-to-r from-primary to-primary-600 text-white px-6 py-2.5 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-50 text-sm font-medium shadow-lg shadow-primary/20 transition-all"
                     >
+                      {/* In timpul salvarii butonul arata un indicator */}
                       {saving ? (
                         <span className="flex items-center gap-2">
                           <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -762,7 +803,7 @@ export default function KnowledgeBase() {
         document.body
       )}
 
-      {/* Confirm Modal */}
+      {/* Fereastra de confirmare */}
       <ConfirmModal
         open={confirmModal.open}
         onClose={() => setConfirmModal({ ...confirmModal, open: false })}
