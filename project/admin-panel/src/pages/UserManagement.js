@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getUsers, createUser, updateUser, deleteUser, resetUserPassword } from '../api';
+import ReactDOM from 'react-dom';
+import { getUsers, createUser, updateUser, deleteUser, resetUserPassword, isDemoError } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../ToastContext';
 import PageHeader from '../components/PageHeader';
 import { timeAgo } from '../utils';
 
+// Pagina de management al utilizatorilor: creare, editare, activare, resetare de parola si stergere
 export default function UserManagement() {
+  // Utilizatorul curent; contul demo vede doar propriul cont
   const { user: currentUser } = useAuth();
+  const isDemo = currentUser?.role === 'demo';
   const { addToast } = useToast();
 
+  // Lista de utilizatori, fereastra de creare sau editare si fereastra de resetare a parolei
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -16,10 +21,11 @@ export default function UserManagement() {
   const [showResetModal, setShowResetModal] = useState(null);
   const [resetPassword, setResetPassword] = useState('');
 
-  // Form state
+  // Starea formularului
   const [form, setForm] = useState({ username: '', email: '', password: '', role: 'admin' });
   const [saving, setSaving] = useState(false);
 
+  // Incarca lista de utilizatori
   const loadUsers = useCallback(async () => {
     try {
       const res = await getUsers();
@@ -30,21 +36,26 @@ export default function UserManagement() {
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
+  // Deschide formularul gol pentru un utilizator nou
   const openCreate = () => {
     setEditUser(null);
     setForm({ username: '', email: '', password: '', role: 'admin' });
     setShowModal(true);
   };
 
+  // Deschide formularul completat cu datele utilizatorului ales
   const openEdit = (u) => {
     setEditUser(u);
     setForm({ username: u.username, email: u.email || '', password: '', role: u.role });
     setShowModal(true);
   };
 
+  // Creeaza utilizatorul nou sau salveaza modificarile celui existent
   const handleSave = async () => {
     if (!form.username.trim()) { addToast('Username obligatoriu', 'error'); return; }
-    if (!editUser && form.password.length < 6) { addToast('Parola minim 6 caractere', 'error'); return; }
+    // Contul demo poate avea parola mai scurta (minim 4 caractere), restul minim 6
+    const minPass = form.role === 'demo' ? 4 : 6;
+    if (!editUser && form.password.length < minPass) { addToast(`Parola minim ${minPass} caractere`, 'error'); return; }
 
     setSaving(true);
     try {
@@ -67,40 +78,52 @@ export default function UserManagement() {
       setShowModal(false);
       loadUsers();
     } catch (err) {
-      addToast(err.response?.data?.detail || 'Eroare', 'error');
+      if (isDemoError(err)) return;
+      const detail = err.response?.data?.detail;
+      // Erorile de validare vin ca lista, deci mesajele se unesc intr-un singur text
+      const msg = Array.isArray(detail) ? detail.map(d => d.msg).join(', ') : (detail || 'Eroare');
+      addToast(msg, 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  // Activeaza sau dezactiveaza contul unui utilizator
   const handleToggleActive = async (u) => {
     try {
       await updateUser(u.id, { is_active: !u.is_active });
       addToast(u.is_active ? 'Cont dezactivat' : 'Cont activat', 'success');
       loadUsers();
     } catch (err) {
+      if (isDemoError(err)) return;
       addToast(err.response?.data?.detail || 'Eroare', 'error');
     }
   };
 
+  // Sterge un utilizator dupa confirmare
   const handleDelete = async (u) => {
     try {
       await deleteUser(u.id);
       addToast('Utilizator sters', 'success');
       loadUsers();
     } catch (err) {
+      if (isDemoError(err)) return;
       addToast(err.response?.data?.detail || 'Eroare', 'error');
     }
   };
 
+  // Seteaza o parola noua pentru utilizator
   const handleResetPassword = async () => {
-    if (resetPassword.length < 6) { addToast('Parola minim 6 caractere', 'error'); return; }
+    // Aceeasi regula de lungime minima si la resetarea parolei
+    const minLen = showResetModal?.role === 'demo' ? 4 : 6;
+    if (resetPassword.length < minLen) { addToast(`Parola minim ${minLen} caractere`, 'error'); return; }
     try {
       await resetUserPassword(showResetModal.id, resetPassword);
       addToast('Parola resetata!', 'success');
       setShowResetModal(null);
       setResetPassword('');
     } catch (err) {
+      if (isDemoError(err)) return;
       addToast(err.response?.data?.detail || 'Eroare', 'error');
     }
   };
@@ -110,7 +133,7 @@ export default function UserManagement() {
       <PageHeader
         title="Utilizatori"
         subtitle="Gestioneaza conturile de administrator"
-        action={
+        action={!isDemo && (
           <button
             onClick={openCreate}
             className="px-4 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
@@ -120,10 +143,10 @@ export default function UserManagement() {
             </svg>
             Utilizator Nou
           </button>
-        }
+        )}
       />
 
-      {/* Users Table */}
+      {/* Tabelul de utilizatori */}
       <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -134,10 +157,11 @@ export default function UserManagement() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Ultima autentificare</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Creat</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actiuni</th>
+                {!isDemo && <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actiuni</th>}
               </tr>
             </thead>
             <tbody>
+              {/* Cat timp se incarca apar randuri placeholder, apoi utilizatorii */}
               {loading ? (
                 [...Array(3)].map((_, i) => (
                   <tr key={i} className="border-b border-gray-50 dark:border-gray-800">
@@ -155,7 +179,7 @@ export default function UserManagement() {
                   </td>
                 </tr>
               ) : (
-                users.map((u) => {
+                (isDemo ? users.filter(u => u.id === currentUser?.id) : users).map((u) => {
                   const isSelf = u.id === currentUser?.id;
                   return (
                     <tr key={u.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
@@ -171,6 +195,7 @@ export default function UserManagement() {
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
                               {u.username}
+                              {/* Eticheta pentru propriul cont */}
                               {isSelf && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Tu</span>
                               )}
@@ -198,7 +223,7 @@ export default function UserManagement() {
                       <td className="px-5 py-3.5 text-xs text-gray-500 dark:text-gray-400">
                         {timeAgo(u.created_at)}
                       </td>
-                      <td className="px-5 py-3.5">
+                      {!isDemo && <td className="px-5 py-3.5">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openEdit(u)}
@@ -218,6 +243,7 @@ export default function UserManagement() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                             </svg>
                           </button>
+                          {/* Propriul cont nu poate fi dezactivat sau sters */}
                           {!isSelf && (
                             <>
                               <button
@@ -249,7 +275,7 @@ export default function UserManagement() {
                             </>
                           )}
                         </div>
-                      </td>
+                      </td>}
                     </tr>
                   );
                 })
@@ -259,8 +285,8 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* Create / Edit Modal */}
-      {showModal && (
+      {/* Fereastra de creare si editare */}
+      {showModal && ReactDOM.createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowModal(false)}>
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 w-full max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -280,6 +306,7 @@ export default function UserManagement() {
                   value={form.username}
                   onChange={(e) => setForm(f => ({ ...f, username: e.target.value }))}
                   placeholder="admin2"
+                  autoComplete="off"
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-dark border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                 />
               </div>
@@ -290,9 +317,11 @@ export default function UserManagement() {
                   value={form.email}
                   onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="admin@exemplu.com"
+                  autoComplete="off"
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-dark border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                 />
               </div>
+              {/* Campul de parola apare doar la crearea unui utilizator nou */}
               {!editUser && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Parola</label>
@@ -301,6 +330,7 @@ export default function UserManagement() {
                     value={form.password}
                     onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
                     placeholder="Minim 6 caractere"
+                    autoComplete="new-password"
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-dark border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                   />
                 </div>
@@ -315,6 +345,7 @@ export default function UserManagement() {
                   <option value="admin">Admin</option>
                   <option value="operator">Operator</option>
                   <option value="viewer">Viewer</option>
+                  <option value="demo">Demo</option>
                 </select>
               </div>
             </div>
@@ -330,6 +361,7 @@ export default function UserManagement() {
                 disabled={saving}
                 className="px-4 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
               >
+                {/* Indicator de incarcare pe butonul de salvare */}
                 {saving && (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -340,11 +372,12 @@ export default function UserManagement() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Reset Password Modal */}
-      {showResetModal && (
+      {/* Fereastra de resetare a parolei */}
+      {showResetModal && ReactDOM.createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowResetModal(null)}>
           <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 w-full max-w-sm mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
@@ -358,7 +391,8 @@ export default function UserManagement() {
                 type="password"
                 value={resetPassword}
                 onChange={(e) => setResetPassword(e.target.value)}
-                placeholder="Minim 6 caractere"
+                placeholder={showResetModal?.role === 'demo' ? 'Minim 4 caractere' : 'Minim 6 caractere'}
+                autoComplete="new-password"
                 className="w-full px-3 py-2 bg-gray-50 dark:bg-dark border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === 'Enter' && handleResetPassword()}
               />
@@ -379,7 +413,8 @@ export default function UserManagement() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
