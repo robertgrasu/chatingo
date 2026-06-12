@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getWidgetConfig, updateWidgetConfig, uploadAvatar, deleteAvatar } from '../api';
+import { getWidgetConfig, updateWidgetConfig, uploadAvatar, deleteAvatar, isDemoError } from '../api';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../ToastContext';
 import { useBot } from '../BotContext';
 
+// Spune daca o culoare hex este deschisa, ca textul de pe ea sa fie ales pentru contrast
 function isLightColor(hex) {
   if (!hex || hex.length < 7) return true;
   const r = parseInt(hex.slice(1, 3), 16);
@@ -12,7 +13,9 @@ function isLightColor(hex) {
   return (r * 299 + g * 587 + b * 114) / 1000 > 150;
 }
 
+// Sectiune care se deschide si se inchide, folosita pentru a grupa setarile
 function Accordion({ title, subtitle, icon, children, defaultOpen = false }) {
+  // Sectiunea este deschisa sau inchisa
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -47,14 +50,18 @@ function Accordion({ title, subtitle, icon, children, defaultOpen = false }) {
   );
 }
 
-/* ── Elegant color picker with hero bar + glow swatches ── */
+// Selector de culoare cu culori predefinite si camp pentru cod hex
 function ColorPicker({ value, onChange, presets }) {
+  // Culoarea alesa decide daca textul de pe bara este inchis sau deschis
   const light = isLightColor(value);
+  // Starea editarii codului hex: modul de editare si textul scris
   const [editHex, setEditHex] = useState(false);
   const [hex, setHex] = useState(value);
 
+  // Configuratia se incarca la pornire si cand se schimba botul
   useEffect(() => { setHex(value); }, [value]);
 
+  // Codul hex se accepta doar in formatul #rrggbb, altfel revine la valoarea veche
   const commitHex = () => {
     const v = hex.startsWith('#') ? hex : `#${hex}`;
     if (/^#[0-9a-f]{6}$/i.test(v)) onChange(v.toLowerCase());
@@ -64,7 +71,7 @@ function ColorPicker({ value, onChange, presets }) {
 
   return (
     <div className="space-y-3">
-      {/* ── Hero bar: selected color + integrated controls ── */}
+      {/* ── Bara principala: culoarea aleasa si controalele ei ── */}
       <div
         className="h-10 rounded-xl flex items-center px-3 gap-2"
         style={{
@@ -73,7 +80,7 @@ function ColorPicker({ value, onChange, presets }) {
           border: light ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
         }}
       >
-        {/* Pencil icon → opens native color picker */}
+        {/* Iconita creion deschide selectorul de culoare al browserului */}
         <label className="flex-shrink-0 cursor-pointer relative">
           <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
             light ? 'bg-black/[0.06] hover:bg-black/[0.12]' : 'bg-white/[0.1] hover:bg-white/[0.2]'
@@ -86,7 +93,7 @@ function ColorPicker({ value, onChange, presets }) {
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
         </label>
 
-        {/* Hex code — click to edit inline */}
+        {/* Codul hex este camp de text in timpul editarii, altfel text pe care se poate da click */}
         {editHex ? (
           <input
             type="text" value={hex}
@@ -109,8 +116,9 @@ function ColorPicker({ value, onChange, presets }) {
         )}
       </div>
 
-      {/* ── Swatches with glow selection ── */}
+      {/* ── Mostrele de culoare, cu efect luminos pe cea aleasa ── */}
       <div className="flex flex-wrap gap-1.5">
+        {/* Cate o mostra pentru fiecare culoare predefinita */}
         {presets.map((color) => {
           const sel = value?.toLowerCase() === color.toLowerCase();
           const sl = isLightColor(color);
@@ -136,7 +144,7 @@ function ColorPicker({ value, onChange, presets }) {
   );
 }
 
-/* Mini avatar icon reused in previews - supports image URL */
+// Avatar mic folosit in previzualizarile din panou
 function MiniAvatar({ size = 18, color, iconSize = 8, avatarUrl, borderStyle }) {
   if (avatarUrl) {
     return (
@@ -164,9 +172,11 @@ function MiniAvatar({ size = 18, color, iconSize = 8, avatarUrl, borderStyle }) 
   );
 }
 
+// Pagina cu setarile de aspect ale widget-ului (culori, avatar, tema, pozitie, functii) si previzualizare live
 export default function Settings() {
   const { addToast } = useToast();
   const { selectedBotId } = useBot();
+  // Configuratia widget-ului, cu valori implicite pana cand se incarca cea de pe server
   const [config, setConfig] = useState({
     welcome_message: '',
     bot_name: 'AI Assistant',
@@ -193,18 +203,21 @@ export default function Settings() {
     bubble_icon: 'chat',
     avatar_size: 42,
   });
+  // Starea salvarii si a incarcarii avatarului, plus referinta spre campul de fisier
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarFileRef = useRef(null);
 
-  /* ─── Preview interactive state ─── */
+  /* ─── Starea previzualizarii interactive ─── */
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewMessages, setPreviewMessages] = useState([]);
   const [previewInput, setPreviewInput] = useState('');
   const [previewTyping, setPreviewTyping] = useState(false);
   const previewMsgsRef = useRef(null);
+  // Indexul raspunsului simulat de bot, ca raspunsurile sa se succeada pe rand
   const botResponseIdx = useRef(0);
 
+  // Raspunsurile simulate ale botului in previzualizare
   const botResponses = [
     'Multumesc pentru mesaj! Cu ce te pot ajuta?',
     'Am inteles. Pot sa te ajut cu orice intrebare.',
@@ -216,19 +229,20 @@ export default function Settings() {
     getWidgetConfig(selectedBotId).then((res) => setConfig(res.data));
   }, [selectedBotId]);
 
-  /* Initialize preview messages */
+  /* Mesajele initiale ale previzualizarii */
   useEffect(() => {
     const welcome = config.welcome_message || 'Buna! Cu ce te pot ajuta?';
     setPreviewMessages([{ role: 'assistant', content: welcome }]);
   }, [config.welcome_message]);
 
-  /* Auto-scroll preview messages */
+  /* Derulare automata la ultimul mesaj din previzualizare */
   useEffect(() => {
     if (previewMsgsRef.current) {
       previewMsgsRef.current.scrollTop = previewMsgsRef.current.scrollHeight;
     }
   }, [previewMessages, previewTyping]);
 
+  // Deschide previzualizarea chat-ului cu mesajul de bun venit
   const handlePreviewOpen = () => {
     setPreviewOpen(true);
     if (previewMessages.length === 0) {
@@ -236,14 +250,18 @@ export default function Settings() {
     }
   };
 
+  // Inchide previzualizarea
   const handlePreviewClose = () => setPreviewOpen(false);
 
+  // In previzualizare raspunsul botului este simulat, fara apel la server
   const handlePreviewSend = () => {
     const text = previewInput.trim();
+    // Mesajele goale sau trimise cat botul scrie sunt ignorate
     if (!text || previewTyping) return;
     setPreviewMessages((prev) => [...prev, { role: 'user', content: text }]);
     setPreviewInput('');
     setPreviewTyping(true);
+    // Raspunsul simulat apare dupa 1,2 secunde, ca sa para ca botul scrie
     setTimeout(() => {
       const response = botResponses[botResponseIdx.current % botResponses.length];
       botResponseIdx.current++;
@@ -252,28 +270,34 @@ export default function Settings() {
     }, 1200);
   };
 
+  // Salveaza setarile widget-ului pentru botul selectat
   const handleSave = async () => {
     setSaving(true);
     try {
       await updateWidgetConfig(config, selectedBotId);
       addToast('Setarile au fost salvate cu succes!', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la salvarea setarilor.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  // Incarca avatarul botului
   const handleAvatarUpload = async (e) => {
+    // Fisierul ales de utilizator
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true);
     try {
       const res = await uploadAvatar(file, selectedBotId);
+      // Adresa completa a avatarului, cu serverul in fata
       const url = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}${res.data.avatar_url}`;
       setConfig((prev) => ({ ...prev, avatar_url: url }));
       addToast('Avatar incarcat cu succes!', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la incarcarea avatarului.', 'error');
     } finally {
       setUploadingAvatar(false);
@@ -281,16 +305,19 @@ export default function Settings() {
     }
   };
 
+  // Sterge avatarul botului
   const handleAvatarDelete = async () => {
     try {
       await deleteAvatar(selectedBotId);
       setConfig((prev) => ({ ...prev, avatar_url: null }));
       addToast('Avatar sters.', 'success');
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la stergerea avatarului.', 'error');
     }
   };
 
+  // Culorile predefinite pentru fiecare sectiune de culoare
   const accentPresets = [
     '#6366f1', '#3b82f6', '#0ea5e9', '#14b8a6', '#10b981', '#84cc16', '#f59e0b', '#f97316',
     '#ef4444', '#e11d48', '#ec4899', '#d946ef', '#8b5cf6', '#7c3aed', '#06b6d4', '#059669', '#0d9488',
@@ -315,6 +342,7 @@ export default function Settings() {
     '#6366f1', '#3b82f6', '#0ea5e9', '#14b8a6', '#10b981', '#84cc16', '#f59e0b', '#f97316',
     '#ef4444', '#e11d48', '#ec4899', '#d946ef', '#8b5cf6', '#7c3aed', '#06b6d4', '#059669',
   ];
+  // Gradientele predefinite, cu culoare de inceput, de sfarsit si unghi
   const gradientPresets = [
     { name: 'Ocean', from: '#0ea5e9', to: '#6366f1', angle: 135 },
     { name: 'Sunset', from: '#f97316', to: '#ef4444', angle: 135 },
@@ -336,16 +364,20 @@ export default function Settings() {
 
   const inputClass = 'w-full border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all';
 
+  // Valorile derivate din configuratie, folosite in previzualizari
   const pos = config.position === 'bottom-left' ? 'left' : 'right';
   const welcomeMsg = config.welcome_message || 'Buna! Cu ce te pot ajuta?';
   const botName = config.bot_name || 'AI Assistant';
   const botSub = config.bot_subtitle || 'AI Agent';
+  // Culoarea accent: simpla sau gradient, daca exista culoarea de sfarsit
   const grad = config.gradient_end_color
     ? `linear-gradient(${config.gradient_angle ?? 135}deg, ${config.primary_color}, ${config.gradient_end_color})`
     : config.primary_color;
+  // grad = culoare accent (solid sau gradient): se aplica pe header, bubble, mesaje
+  // Imaginea avatarului, daca exista
   const avatarUrl = config.avatar_url || null;
 
-  /* ─── Bubble icon renderer for previews ─── */
+  // Returneaza iconita SVG a butonului de chat dupa tipul ales
   const renderBubbleIconSvg = (iconType, size = 18, fillColor = '#14161a') => {
     switch (iconType) {
       case 'message':
@@ -354,66 +386,127 @@ export default function Settings() {
             <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 5L2 7" />
           </svg>
         );
-      case 'support':
+      case 'support': {
+        // Casca de suport - acelasi desen ca in widget/src/components/BubbleIcons.js
         return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 18v-6a9 9 0 0118 0v6" /><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+          <svg width={size} height={size} viewBox="256 31 514 514" fill={fillColor} stroke="none">
+            <path d="M616.484192,387.457458 C637.145203,395.589355 657.852905,402.617889 677.641663,411.807831 C706.941101,425.414490 724.114075,448.330536 727.764648,480.717224 C728.587158,488.014771 725.465027,494.128967 719.472229,498.426788 C708.698914,506.153046 696.068176,509.584015 683.594788,513.140442 C657.888977,520.469788 631.576416,524.462341 604.946655,526.391113 C551.694153,530.248169 498.372681,529.582703 445.085480,527.889099 C408.080902,526.712952 371.416962,522.175598 335.825470,511.232269 C326.744080,508.440002 317.720856,505.411621 309.546539,500.425232 C302.027100,495.838379 297.523438,489.449005 298.511597,480.206543 C301.976624,447.797852 319.348999,425.177704 348.471100,411.856598 C372.700287,400.773682 397.888855,391.925964 422.802277,382.465515 C425.891357,381.292480 427.630981,382.246552 429.774384,384.287811 C475.286957,427.631531 549.985596,427.711823 595.971436,384.451813 C598.483948,382.088226 600.738708,381.313690 603.974060,382.718170 C607.941040,384.440216 612.065552,385.799408 616.484192,387.457458 Z" />
+            <path d="M513.762451,393.478210 C485.014496,393.558716 462.797516,380.619720 444.257141,360.478394 C430.584991,345.625702 420.460449,328.433716 413.129120,309.614502 C412.334167,307.573883 411.637939,305.636566 412.879089,303.420074 C416.547882,296.868347 416.612946,289.885590 415.659882,282.594055 C412.189301,256.041504 408.975739,229.455338 405.666656,202.881668 C405.271820,199.711014 404.625153,196.473251 402.891052,193.876495 C400.240143,189.906860 400.776123,186.258789 402.258606,182.097946 C418.269409,137.160980 450.922180,113.050758 497.312347,106.680489 C528.434448,102.406822 557.288208,109.256462 583.244568,127.087120 C604.247253,141.514893 617.744446,161.459091 624.910278,185.802170 C625.339600,187.260727 625.815430,188.825500 624.937378,190.170563 C619.369263,198.701065 619.707703,208.624237 618.472046,218.107269 C615.700195,239.378891 613.350281,260.705170 610.746216,281.999146 C609.823975,289.540619 609.606934,296.875854 613.247864,303.949585 C615.220276,307.781769 611.148010,316.842529 607.041748,318.152863 C589.448792,323.766815 571.357239,326.140839 552.926941,326.150940 C550.667480,326.152191 548.737000,325.226410 546.934143,323.939331 C542.154297,320.526947 536.860840,319.027740 530.955322,319.265686 C525.630798,319.480316 520.290710,319.271973 514.958435,319.334320 C501.830017,319.487854 491.460785,329.889862 491.043518,343.269806 C490.610962,357.141113 500.155640,368.361481 513.517700,368.899536 C521.140015,369.206451 528.815613,369.880615 536.460388,368.790009 C539.309937,368.383514 542.188538,367.779144 544.394836,366.016418 C548.197021,362.978546 552.411621,362.610718 557.031738,362.557190 C564.455750,362.471161 571.873047,361.801819 579.515076,361.366333 C574.205078,372.597900 542.517395,394.630249 513.762451,393.478210 Z" />
+            <path d="M346.693176,182.979950 C353.287811,149.425095 368.330414,120.735664 392.425842,97.086304 C418.590546,71.405991 450.092163,56.483746 486.441559,51.373772 C524.885071,45.969406 561.729187,50.920551 595.843384,69.532654 C643.432373,95.496422 671.828430,135.660660 680.394226,189.436752 C681.179749,194.367996 682.712158,198.018860 687.216309,201.202194 C697.939514,208.780838 702.348022,219.804977 701.485474,232.910629 C700.512390,247.697403 698.397583,262.359924 696.277771,277.001923 C694.136719,291.789825 685.834473,301.900177 671.483887,306.747498 C669.776611,307.324158 668.028809,307.665405 666.759460,309.284668 C651.746704,328.436157 630.976318,337.989044 608.270203,344.390411 C589.200256,349.766663 569.684448,351.471527 549.994812,351.856964 C546.881531,351.917908 544.015625,352.217621 541.916199,354.853607 C541.613647,355.233521 541.156921,355.500885 540.745728,355.782532 C535.834717,359.145691 513.163818,359.470276 508.159454,356.255249 C503.674835,353.374084 500.901367,347.068634 501.864380,341.943512 C503.027618,335.752716 507.701538,330.763275 513.884155,330.154175 C520.668030,329.485809 527.527100,329.526611 534.333435,330.240723 C537.192322,330.540680 540.177124,331.376343 541.905945,333.675140 C544.499207,337.123413 548.002258,337.611298 551.666382,337.457977 C571.499756,336.628082 591.193970,334.781952 610.268555,328.765594 C621.136658,325.337677 631.276550,320.483612 640.899719,314.336334 C645.321411,311.511719 647.032043,307.843689 647.590332,302.974396 C650.923828,273.903931 654.349121,244.844025 657.758789,215.782349 C658.494446,209.512314 658.216492,202.867081 660.281189,197.061737 C664.814697,184.314056 659.811340,173.043335 655.453125,162.120941 C634.467651,109.528069 595.491638,77.991493 539.836182,68.920441 C494.902496,61.596867 452.839111,70.422371 416.370361,99.114319 C388.145569,121.320290 371.268066,150.738892 363.767639,185.691406 C363.525879,186.817978 363.155579,188.126968 363.491364,189.135849 C368.261139,203.466415 368.272339,218.529938 370.264984,233.271683 C373.427521,256.667542 376.040924,280.137268 379.013580,303.559631 C379.401825,306.618500 378.976196,308.272644 375.502655,308.543243 C352.971771,310.298370 332.575867,300.921875 329.517853,274.512756 C327.795959,259.641876 325.202820,244.863907 324.660278,229.872650 C324.268219,219.040192 327.922089,209.268814 336.663513,203.141739 C344.069916,197.950424 346.123077,191.393219 346.693176,182.979950 M340.178284,227.044083 C339.642303,234.716431 341.325409,242.182465 342.299530,249.713242 C342.623383,252.216919 343.684570,254.546143 346.540436,254.149307 C349.230957,253.775467 350.101318,251.404816 349.815125,248.813599 C348.925385,240.758575 348.103210,232.692719 346.986023,224.668488 C346.686981,222.520432 347.438019,219.954346 345.108337,217.968887 C342.139374,219.949020 340.896698,222.871735 340.178284,227.044083 M684.649902,244.218979 C685.199890,238.789719 686.318665,233.397110 685.899780,227.902664 C685.597473,223.937775 684.652832,220.244278 680.305725,217.403610 C678.426392,228.786377 676.958984,239.546127 676.358521,250.420364 C676.254395,252.307388 677.209656,253.678680 679.080200,254.041992 C681.203125,254.454330 682.713379,253.186279 683.345520,251.395248 C684.052979,249.391083 684.220459,247.196320 684.649902,244.218979 Z" />
+            <path d="M573.666382,104.326355 C522.186890,81.357742 473.913605,85.954811 428.771545,119.471420 C423.151825,123.643898 417.530640,125.950256 410.753693,122.823051 C405.702698,120.492279 405.414917,118.863808 409.433197,114.930725 C431.338837,93.489418 457.567322,80.263054 487.810974,76.188705 C535.954041,69.702995 579.571533,79.812653 615.792969,114.160110 C621.046509,119.141815 620.610535,121.025566 613.687134,123.446762 C608.311157,125.326813 603.446167,124.092094 599.153015,120.697876 C591.284973,114.477303 583.033936,108.886368 573.666382,104.326355 Z" />
+            <path d="M402.042969,260.237366 C403.085358,268.597717 403.870117,276.539307 405.059204,284.419891 C406.820007,296.089386 401.880829,304.649445 392.041626,306.829529 C388.477936,307.619110 386.807983,306.770477 386.379639,302.958893 C384.616180,287.266754 382.691498,271.592621 380.794952,255.915634 C378.619537,237.933441 376.404724,219.956024 374.225586,201.974274 C373.965668,199.829636 374.065033,197.613968 373.576508,195.529999 C372.407837,190.544403 374.801575,189.446198 379.162476,189.664551 C386.618713,190.037918 393.096985,194.994995 394.556305,202.938751 C396.235260,212.078110 397.055206,221.375534 398.239227,230.605484 C399.487091,240.333405 400.724335,250.062668 402.042969,260.237366 Z" />
+            <path d="M643.779663,268.558899 C642.434326,280.054901 641.072083,291.106262 640.014893,302.186737 C639.592163,306.617432 637.969727,307.908691 633.573425,306.606689 C625.013550,304.071472 619.806458,297.112213 620.879395,288.225800 C623.945007,262.834259 627.198608,237.465454 630.378601,212.087723 C630.791687,208.790512 630.900024,205.418762 631.681152,202.211029 C633.721069,193.834137 641.352905,188.716873 649.626526,189.678253 C652.390442,189.999435 653.328674,191.164871 652.983826,193.935684 C649.906616,218.660278 646.907349,243.394547 643.779663,268.558899 Z" />
           </svg>
         );
-      case 'bot':
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2l1.09 3.26L16.36 6l-3.27 1.09L12 10.36l-1.09-3.27L7.64 6l3.27-1.09L12 2z" />
-            <path d="M18 12l.7 2.1 2.3.7-2.3.7-.7 2.1-.7-2.1-2.3-.7 2.3-.7L18 12z" />
-            <path d="M7 16l.5 1.5 1.5.5-1.5.5L7 20l-.5-1.5L5 18l1.5-.5L7 16z" />
-          </svg>
-        );
+      }
       case 'lightning':
+        // Bula ovala organica - inlocuieste fulgerul
         return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill={fillColor} />
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <ellipse cx="12" cy="10.3" rx="9" ry="7.3" />
+            <path d="M8 16.3c-.4 2-1.7 3.5-1.7 3.5s2.3-.3 4-1.8" />
           </svg>
         );
       case 'heart':
+        // Sclipici AI - un singur path, plus un al doilea mai mic cu aceeasi culoare (doar opacitate
+        // diferita), deci merge perfect cu sistemul de o singura culoare configurabila a pachetului.
         return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" fill={fillColor} />
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="none">
+            <path d="M12 2.5c.6 4.3 2 7.1 5.2 8.5-3.2 1.4-4.6 4.2-5.2 8.5-.6-4.3-2-7.1-5.2-8.5 3.2-1.4 4.6-4.2 5.2-8.5z" fill={fillColor} />
+            <path d="M18.5 3c.25 1.7.8 2.8 2 3.4-1.2.6-1.75 1.7-2 3.4-.25-1.7-.8-2.8-2-3.4 1.2-.6 1.75-1.7 2-3.4z" fill={fillColor} opacity="0.65" />
+          </svg>
+        );
+      case 'smile':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M8.3 13.3c.95 1.3 2.2 2 3.7 2s2.75-.7 3.7-2" />
+            <circle cx="8.7" cy="9.8" r="1" fill={fillColor} stroke="none" />
+            <circle cx="15.3" cy="9.8" r="1" fill={fillColor} stroke="none" />
+          </svg>
+        );
+      case 'dots':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3C6.75 3 2.5 6.6 2.5 11s4.25 8 9.5 8c.86 0 1.7-.1 2.47-.28L19 21l-1.1-4.2C19.68 15.3 21.5 13.3 21.5 11c0-4.4-4.25-8-9.5-8z" />
+            <circle cx="8.3" cy="11" r="1.05" fill={fillColor} stroke="none" />
+            <circle cx="12" cy="11" r="1.05" fill={fillColor} stroke="none" />
+            <circle cx="15.7" cy="11" r="1.05" fill={fillColor} stroke="none" />
+          </svg>
+        );
+      case 'send':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.5 2.5L11 13" />
+            <path d="M21.5 2.5l-7 19-4-9-9-4 20-6z" />
+          </svg>
+        );
+      case 'question':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.5 11.2a8.3 8.3 0 01-11.9 7.5L4 20l1.3-4.6a8.3 8.3 0 1115.2-4.2z" />
+            <path d="M9.6 9.3a2.4 2.4 0 014.65.8c0 1.6-2.25 1.8-2.25 3.4" />
+            <circle cx="12" cy="16.6" r="0.25" fill={fillColor} stroke="none" />
+          </svg>
+        );
+      case 'bot':
+        // Avion de trimis (path oficial Font Awesome Solid "paper-plane")
+        return (
+          <svg width={size} height={size} viewBox="0 0 512 512" fill={fillColor} stroke="none">
+            <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-52.1 60.9c-6.1 7.1-15.6 9.9-24.5 7.1S192 484.6 192 475.2V416c0-4 1.5-7.8 4.2-10.7L365.6 219.6c7.3-8 6.9-20.1-.8-27.6s-19.7-8.1-27.9-.9L130.8 328.4l-109.7-44.1c-9.5-3.8-15.8-12.9-16.1-23.1s5.5-19.7 14.8-24.1l460.9-224c11.6-5.6 25-4.4 35.1 2.3z" />
           </svg>
         );
       case 'chat':
-      default:
+      default: {
+        // Bula rotunjita cu 3 puncte decupate prin mask (gauri reale, nu culoare ghicita)
+        const mid = `settings-chat-mask-${Math.random().toString(36).slice(2, 9)}`;
         return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fillColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="none">
+            <defs>
+              <mask id={mid}>
+                <rect x="3" y="4" width="18" height="13" rx="5" fill="white" />
+                <path d="M8 16.5L8 21 13 16.5z" fill="white" />
+                <circle cx="8.5" cy="10.5" r="1.15" fill="black" />
+                <circle cx="12" cy="10.5" r="1.15" fill="black" />
+                <circle cx="15.5" cy="10.5" r="1.15" fill="black" />
+              </mask>
+            </defs>
+            <g fill={fillColor} mask={`url(#${mid})`}>
+              <rect x="3" y="4" width="18" height="13" rx="5" />
+              <path d="M8 16.5L8 21 13 16.5z" />
+            </g>
           </svg>
         );
+      }
     }
   };
 
-  /* ─── Classic Preview ─── */
+  // Previzualizarea temei clasice: fereastra de chat si butonul
   const renderClassicPreview = () => (
     <>
+      {/* Fereastra de chat este desenata doar cand previzualizarea este deschisa */}
       {previewOpen && (
         <div
           className="absolute bottom-20 shadow-2xl overflow-hidden flex flex-col"
           style={{ width: '280px', borderRadius: '16px', [pos]: '16px', top: '70px' }}
         >
-          <div className="text-white px-4 py-3 text-sm font-semibold flex items-center gap-2.5 flex-shrink-0" style={{ backgroundColor: config.header_color }}>
+          <div className="text-white px-4 py-3 text-sm font-semibold flex items-center gap-2.5 flex-shrink-0" style={{ background: grad }}>
             <div style={{ position: 'relative' }}>
               <MiniAvatar size={Math.round((config.avatar_size || 42) * 0.67)} color={config.avatar_color} iconSize={Math.round((config.avatar_size || 42) * 0.29)} avatarUrl={avatarUrl} />
               {config.show_online_status !== false && (
-                <div style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', border: '1.5px solid ' + config.header_color }} />
+                <div style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', border: '1.5px solid transparent' }} />
               )}
             </div>
             <div>
-              <div className={`font-semibold leading-tight ${config.header_color === '#ffffff' ? 'text-gray-900' : ''}`} style={{ fontSize: config.show_subtitle !== false ? '12px' : '14px' }}>{botName}</div>
+              <div className="font-semibold leading-tight" style={{ fontSize: config.show_subtitle !== false ? '12px' : '14px' }}>{botName}</div>
               {config.show_subtitle !== false && (
-                <div className={`text-[10px] leading-tight mt-0.5 ${config.header_color === '#ffffff' ? 'text-gray-400' : 'text-white/50'}`}>{botSub}</div>
+                <div className="text-[10px] leading-tight mt-0.5 text-white/50">{botSub}</div>
               )}
             </div>
-            <span onClick={handlePreviewClose} className={`ml-auto text-xs cursor-pointer hover:opacity-70 ${config.header_color === '#ffffff' ? 'text-gray-300' : 'text-white/40'}`}>&#x2715;</span>
+            <span onClick={handlePreviewClose} className="ml-auto text-xs cursor-pointer hover:opacity-70 text-white/40">&#x2715;</span>
           </div>
           <div ref={previewMsgsRef} className="bg-white flex-1 overflow-y-auto" style={{ padding: '10px 14px' }}>
+            {/* Fiecare mesaj din previzualizare */}
             {previewMessages.map((msg, i) =>
               msg.role === 'assistant' ? (
                 <div key={i} style={{ marginBottom: '8px' }}>
@@ -424,12 +517,13 @@ export default function Settings() {
                 </div>
               ) : (
                 <div key={i} className="flex justify-end" style={{ marginBottom: '8px' }}>
-                  <div className="text-xs p-2.5 rounded-xl rounded-br-sm text-white max-w-[180px]" style={{ backgroundColor: config.user_message_color || config.primary_color }}>
+                  <div className="text-xs p-2.5 rounded-xl rounded-br-sm text-white max-w-[180px]" style={{ background: config.user_message_color || grad }}>
                     {msg.content}
                   </div>
                 </div>
               )
             )}
+            {/* Indicatorul ca botul scrie */}
             {previewTyping && (
               <div style={{ marginBottom: '8px' }}>
                 <div className="text-xs p-2.5 rounded-xl rounded-bl-sm inline-flex gap-1 items-center" style={{ backgroundColor: config.bot_message_color || '#f5f5f5' }}>
@@ -480,24 +574,29 @@ export default function Settings() {
           </div>
         </div>
       )}
-      {/* Bubble */}
-      {!previewOpen && (
-        <div
-          onClick={handlePreviewOpen}
-          className="absolute bottom-4 w-12 h-12 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-          style={{
-            backgroundColor: config.bubble_color || '#ffffff',
-            [pos]: '16px',
-            boxShadow: '0 1px 6px 0 rgba(0,0,0,0.06), 0 2px 32px 0 rgba(0,0,0,0.16)',
-          }}
-        >
-          {renderBubbleIconSvg(config.bubble_icon, 20, config.bubble_icon_color || '#14161a')}
-        </div>
-      )}
+      {/* Butonul de chat apare cand fereastra este inchisa */}
+      {!previewOpen && (() => {
+        const isCustomBubble = config.bubble_color && config.bubble_color !== '#ffffff';
+        const bubbleBg = isCustomBubble ? config.bubble_color : grad;
+        const bubbleIcon = isCustomBubble ? (config.bubble_icon_color || '#14161a') : '#ffffff';
+        return (
+          <div
+            onClick={handlePreviewOpen}
+            className="absolute bottom-4 w-12 h-12 rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+            style={{
+              background: bubbleBg,
+              [pos]: '16px',
+              boxShadow: '0 1px 6px 0 rgba(0,0,0,0.06), 0 2px 32px 0 rgba(0,0,0,0.16)',
+            }}
+          >
+            {renderBubbleIconSvg(config.bubble_icon, 20, bubbleIcon)}
+          </div>
+        );
+      })()}
     </>
   );
 
-  /* ─── LiveChat Preview (faithful to real widget) ─── */
+  // Previzualizarea temei livechat
   const renderLiveChatPreview = () => (
     <>
       {previewOpen && (
@@ -508,7 +607,7 @@ export default function Settings() {
             padding: '8px',
           }}
         >
-          {/* Inner container - matches real widget structure */}
+          {/* Containerul interior, cu aceeasi structura ca widget-ul real */}
           <div style={{
             display: 'flex', flexDirection: 'column',
             width: '100%', height: '100%',
@@ -517,12 +616,12 @@ export default function Settings() {
             boxShadow: 'rgba(0,0,0,0.08) 0px 0.48px 2.41px -0.38px, rgba(0,0,0,0.25) 0px 4px 20px -0.75px',
             overflow: 'hidden', position: 'relative',
           }}>
-            {/* Header overlay zone - floats over messages */}
+            {/* Zona de antet, care pluteste peste mesaje */}
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0,
               zIndex: 3, pointerEvents: 'none',
             }}>
-              {/* Backdrop blur simulation */}
+              {/* Simularea estomparii fundalului */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0,
                 height: '62px',
@@ -530,13 +629,13 @@ export default function Settings() {
                 pointerEvents: 'none',
               }} />
 
-              {/* Top buttons row */}
+              {/* Randul cu butoanele de sus */}
               <div style={{
                 position: 'relative', display: 'flex',
                 justifyContent: 'space-between', alignItems: 'center',
                 padding: '6px 6px 0', pointerEvents: 'auto',
               }}>
-                {/* Menu button */}
+                {/* Butonul de meniu */}
                 <div style={{
                   width: '20px', height: '20px', borderRadius: '50%',
                   background: 'rgb(221,221,221)', display: 'flex',
@@ -546,7 +645,7 @@ export default function Settings() {
                     <path d="M7,16 C8.1045695,16 9,15.1045695 9,14 C9,12.8954305 8.1045695,12 7,12 C5.8954305,12 5,12.8954305 5,14 C5,15.1045695 5.8954305,16 7,16 Z M14,16 C15.1045695,16 16,15.1045695 16,14 C16,12.8954305 15.1045695,12 14,12 C12.8954305,12 12,12.8954305 12,14 C12,15.1045695 12.8954305,16 14,16 Z M21,16 C22.1045695,16 23,15.1045695 23,14 C23,12.8954305 22.1045695,12 21,12 C19.8954305,12 19,12.8954305 19,14 C19,15.1045695 19.8954305,16 21,16 Z" />
                   </svg>
                 </div>
-                {/* Minimize button - exact icon from widget */}
+                {/* Butonul de minimizare, cu iconita din widget */}
                 <div onClick={handlePreviewClose} style={{
                   width: '20px', height: '20px', borderRadius: '50%',
                   background: 'rgb(221,221,221)', display: 'flex',
@@ -559,7 +658,7 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Dynamic Island - Agent Bar */}
+              {/* Bara agentului, in stil Dynamic Island */}
               <div style={{
                 position: 'absolute', top: '7px', left: 0, right: 0,
                 display: 'flex', justifyContent: 'center',
@@ -590,7 +689,7 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Messages area - scrolls under header like real widget */}
+            {/* Zona de mesaje, care trece pe sub antet ca in widget-ul real */}
             <div ref={previewMsgsRef} style={{
               padding: '58px 12px 8px',
               flex: 1, overflowY: 'auto',
@@ -653,13 +752,13 @@ export default function Settings() {
               )}
             </div>
 
-            {/* Input area - matches real widget structure */}
+            {/* Zona de scris, cu aceeasi structura ca widget-ul real */}
             <div style={{ flexShrink: 0, margin: '0 10px' }}>
               <div style={{
                 position: 'relative', display: 'flex', alignItems: 'center',
                 height: '32px',
               }}>
-                {/* + attachment button */}
+                {/* Butonul de atasare */}
                 {config.enable_attachments !== false && (
                   <div style={{
                     position: 'absolute', left: '5px', zIndex: 1,
@@ -674,7 +773,7 @@ export default function Settings() {
                   </div>
                 )}
 
-                {/* Pill input field */}
+                {/* Campul de text in forma de pilula */}
                 <input
                   type="text"
                   value={previewInput}
@@ -695,12 +794,12 @@ export default function Settings() {
                   }}
                 />
 
-                {/* Right buttons: emoji + send */}
+                {/* Butoanele din dreapta: emoji si trimitere */}
                 <div style={{
                   position: 'absolute', right: '5px',
                   display: 'flex', alignItems: 'center', gap: '2px', zIndex: 1,
                 }}>
-                  {/* Emoji button */}
+                  {/* Butonul de emoji */}
                   {config.enable_emoji !== false && (
                     <div style={{
                       width: '22px', height: '22px', borderRadius: '50%',
@@ -717,7 +816,7 @@ export default function Settings() {
                       </svg>
                     </div>
                   )}
-                  {/* Send button */}
+                  {/* Butonul de trimitere */}
                   <div onClick={handlePreviewSend} style={{
                     width: '22px', height: '22px', borderRadius: '50%',
                     background: previewInput.trim() ? (config.send_button_color || config.primary_color || 'rgb(17,17,17)') : 'rgb(227,227,227)',
@@ -733,7 +832,7 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Powered by footer */}
+            {/* Subsolul cu mentiunea de atribuire */}
             <div style={{
               flexShrink: 0, textAlign: 'center',
               padding: '4px 0 6px', fontSize: '8px', color: 'rgb(87,87,87)',
@@ -744,7 +843,7 @@ export default function Settings() {
         </div>
       )}
 
-      {/* LiveChat Bubble - matches real widget */}
+      {/* Butonul de chat al temei livechat, la fel ca in widget-ul real */}
       {!previewOpen && (
         <div
           onClick={handlePreviewOpen}
@@ -762,7 +861,7 @@ export default function Settings() {
     </>
   );
 
-  /* ─── Modern Preview ─── */
+  // Previzualizarea temei modern
   const renderModernPreview = () => (
     <>
       {previewOpen && (
@@ -774,7 +873,7 @@ export default function Settings() {
             boxShadow: '0 20px 40px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.04)',
           }}
         >
-          {/* Gradient header */}
+          {/* Antetul cu gradient */}
           <div style={{
             background: grad, padding: '12px 12px 14px',
             display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0,
@@ -806,9 +905,9 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* White content area */}
+          {/* Zona de continut alba */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', minHeight: 0, borderRadius: '0 0 16px 16px', overflow: 'hidden' }}>
-            {/* Messages area */}
+            {/* Zona de mesaje */}
             <div ref={previewMsgsRef} style={{ padding: '10px 12px 8px', background: '#f8f9fb', flex: 1, overflowY: 'auto' }}>
               {previewMessages.map((msg, i) =>
                 msg.role === 'assistant' ? (
@@ -853,7 +952,7 @@ export default function Settings() {
             {/* Separator */}
             <div style={{ height: '1px', background: '#f0f1f3' }} />
 
-            {/* Input row */}
+            {/* Randul de scris */}
             <div style={{ padding: '8px 10px', background: '#ffffff', display: 'flex', alignItems: 'center', gap: '5px' }}>
               {config.enable_attachments !== false && (
                 <div style={{
@@ -908,7 +1007,7 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* Subsol */}
             <div style={{ textAlign: 'center', padding: '2px 0 7px', fontSize: '8px', color: '#b0b4ba' }}>
               Powered by <strong style={{ color: '#8b8f96' }}>ChatBot</strong>
             </div>
@@ -916,7 +1015,7 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Modern Gradient Bubble */}
+      {/* Butonul de chat cu gradient al temei modern */}
       {!previewOpen && (
         <div
           onClick={handlePreviewOpen}
@@ -934,6 +1033,7 @@ export default function Settings() {
     </>
   );
 
+  // Alege previzualizarea dupa tema configurata
   const renderPreview = () => {
     switch (config.widget_theme) {
       case 'livechat': return renderLiveChatPreview();
@@ -942,22 +1042,22 @@ export default function Settings() {
     }
   };
 
-  /* ─── Which color sections are relevant per theme ─── */
+  // Unele sectiuni de culoare apar doar la anumite teme
   const theme = config.widget_theme;
-  const showHeaderColor = theme === 'default';
   const showBubbleColors = theme !== 'modern';
   const showBotMsgColor = theme === 'default';
 
   return (
     <div className="animate-page-enter">
       <PageHeader
-        title="Settings"
+        title="Setări Widget"
         subtitle="Personalizeaza aspectul si comportamentul widget-ului."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left: Accordions */}
+        {/* Stanga: sectiunile pliabile */}
         <div className="space-y-3">
+          {/* Sectiunea cu tema widget-ului */}
           <Accordion
             title="Tema Widget"
             icon="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
@@ -1011,13 +1111,15 @@ export default function Settings() {
             </div>
           </Accordion>
 
+          {/* Sectiunea pentru avatar */}
           <Accordion title="Avatar" icon="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z">
             <div className="space-y-5">
-              {/* Avatar image upload */}
+              {/* Incarcarea imaginii de avatar */}
               <div>
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Imagine avatar / logo</label>
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 border-2 border-gray-200 dark:border-gray-600" style={{ background: config.avatar_url ? 'transparent' : config.avatar_color }}>
+                    {/* Previzualizarea avatarului incarcat, altfel un loc gol */}
                     {config.avatar_url ? (
                       <img src={config.avatar_url} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
@@ -1047,7 +1149,7 @@ export default function Settings() {
                 </div>
                 <p className="text-[10px] text-gray-400 mt-2">PNG, JPG, GIF, WebP sau SVG. Se foloseste ca avatar in chat.</p>
               </div>
-              {/* Fallback color */}
+              {/* Culoarea folosita cand nu exista imagine */}
               <div>
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Culoare avatar (fallback)</label>
                 <ColorPicker
@@ -1056,7 +1158,7 @@ export default function Settings() {
                   presets={avatarPresets}
                 />
               </div>
-              {/* Avatar size slider */}
+              {/* Cursorul pentru dimensiunea avatarului */}
               <div>
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Dimensiune avatar header</label>
                 <div className="flex items-center gap-3">
@@ -1076,8 +1178,9 @@ export default function Settings() {
             </div>
           </Accordion>
 
+          {/* Sectiunea pentru culoarea accent, simpla sau gradient */}
           <Accordion title="Culoare accent" icon="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01">
-            {/* Solid / Gradient toggle */}
+            {/* Comutatorul intre culoare simpla si gradient */}
             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5 mb-4">
               <button
                 onClick={() => setConfig({ ...config, gradient_end_color: null })}
@@ -1106,26 +1209,28 @@ export default function Settings() {
               </button>
             </div>
 
+            {/* Culoare simpla sau gradient, dupa cum exista culoarea de sfarsit */}
             {!config.gradient_end_color ? (
-              /* ── Solid mode — hero bar is built into ColorPicker ── */
+              /* ── Modul culoare simpla: bara principala este in ColorPicker ── */
               <ColorPicker
                 value={config.primary_color}
                 onChange={(c) => setConfig({ ...config, primary_color: c })}
                 presets={accentPresets}
               />
             ) : (
-              /* ── Gradient mode ── */
+              /* ── Modul gradient ── */
               <div className="space-y-4">
-                {/* Live gradient preview */}
+                {/* Previzualizarea gradientului */}
                 <div
                   className="h-10 rounded-xl relative overflow-hidden"
                   style={{ background: `linear-gradient(${config.gradient_angle ?? 135}deg, ${config.primary_color}, ${config.gradient_end_color})` }}
                 />
 
-                {/* Gradient presets */}
+                {/* Gradiente predefinite */}
                 <div>
                   <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Preset-uri</label>
                   <div className="grid grid-cols-4 gap-2">
+                    {/* Cate o mostra pentru fiecare gradient predefinit */}
                     {gradientPresets.map((p, i) => {
                       const active = config.primary_color === p.from && config.gradient_end_color === p.to;
                       return (
@@ -1146,7 +1251,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* From / To fine-tune */}
+                {/* Ajustarea culorilor de inceput si de sfarsit */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Start</label>
@@ -1168,7 +1273,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Direction */}
+                {/* Directia gradientului */}
                 <div>
                   <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Directie</label>
                   <div className="flex gap-1.5">
@@ -1194,16 +1299,8 @@ export default function Settings() {
             )}
           </Accordion>
 
-          {showHeaderColor && (
-            <Accordion title="Culoare header" icon="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z">
-              <ColorPicker
-                value={config.header_color}
-                onChange={(c) => setConfig({ ...config, header_color: c })}
-                presets={headerPresets}
-              />
-            </Accordion>
-          )}
 
+          {/* Culoarea mesajelor botului apare doar la tema implicita */}
           {showBotMsgColor && (
             <Accordion title="Culoare mesaje bot" icon="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z">
               <ColorPicker
@@ -1214,6 +1311,7 @@ export default function Settings() {
             </Accordion>
           )}
 
+          {/* Sectiunea pentru culorile butonului de trimitere si ale mesajelor vizitatorului */}
           <Accordion title="Culori personalizate" icon="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z">
             <div className="space-y-5">
               <div>
@@ -1279,6 +1377,7 @@ export default function Settings() {
             </div>
           </Accordion>
 
+          {/* Culorile butonului flotant nu se aplica la tema modern */}
           {showBubbleColors && (
             <Accordion title="Buton flotant" icon="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
               <div className="space-y-5">
@@ -1302,37 +1401,48 @@ export default function Settings() {
             </Accordion>
           )}
 
+          {/* Sectiunea pentru iconita butonului de chat */}
           <Accordion title="Iconita buton" icon="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
             <div className="grid grid-cols-3 gap-2">
               {[
+                // Fiecare thumbnail foloseste exact aceleasi path-uri ca widget/src/components/BubbleIcons.js,
+                // ca iconita aleasa aici sa arate identic cu cea din widget-ul real.
                 { value: 'chat', label: 'Chat', icon: (
-                  <svg width="20" height="20" viewBox="0 0 28 32" fill="currentColor">
-                    <path d="M28 12.8C28 5.732 21.732 0 14 0S0 5.732 0 12.8c0 5.396 3.592 10.024 8.68 11.88L14 32l5.32-7.32C24.408 22.824 28 18.196 28 12.8zM8 10.4a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2zm6 0a1.6 1.6 0 110 3.2 1.6 1.6 0 010-3.2z"/>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="none">
+                    <defs><mask id="picker-chat-mask"><rect x="3" y="4" width="18" height="13" rx="5" fill="white" /><path d="M8 16.5L8 21 13 16.5z" fill="white" /><circle cx="8.5" cy="10.5" r="1.15" fill="black" /><circle cx="12" cy="10.5" r="1.15" fill="black" /><circle cx="15.5" cy="10.5" r="1.15" fill="black" /></mask></defs>
+                    <g fill="currentColor" mask="url(#picker-chat-mask)"><rect x="3" y="4" width="18" height="13" rx="5" /><path d="M8 16.5L8 21 13 16.5z" /></g>
                   </svg>
                 )},
                 { value: 'message', label: 'Mesaj', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 5L2 7" />
                   </svg>
                 )},
-                { value: 'support', label: 'Support', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 16.016c1.245-1.238 2-2.966 2-4.516a7.5 7.5 0 00-15 0c0 1.55.755 3.278 2 4.516"/><path d="M3.5 14v-2.5a8.5 8.5 0 0117 0V14"/><path d="M3.5 11.5a2 2 0 00-2 2v2a2 2 0 002 2h1a1 1 0 001-1v-4a1 1 0 00-1-1h-1z"/><path d="M20.5 11.5a2 2 0 012 2v2a2 2 0 01-2 2h-1a1 1 0 01-1-1v-4a1 1 0 011-1h1z"/>
+                { value: 'support', label: 'Suport', icon: (
+                  <svg width="20" height="20" viewBox="256 31 514 514" fill="currentColor" stroke="none">
+                    <path d="M616.484192,387.457458 C637.145203,395.589355 657.852905,402.617889 677.641663,411.807831 C706.941101,425.414490 724.114075,448.330536 727.764648,480.717224 C728.587158,488.014771 725.465027,494.128967 719.472229,498.426788 C708.698914,506.153046 696.068176,509.584015 683.594788,513.140442 C657.888977,520.469788 631.576416,524.462341 604.946655,526.391113 C551.694153,530.248169 498.372681,529.582703 445.085480,527.889099 C408.080902,526.712952 371.416962,522.175598 335.825470,511.232269 C326.744080,508.440002 317.720856,505.411621 309.546539,500.425232 C302.027100,495.838379 297.523438,489.449005 298.511597,480.206543 C301.976624,447.797852 319.348999,425.177704 348.471100,411.856598 C372.700287,400.773682 397.888855,391.925964 422.802277,382.465515 C425.891357,381.292480 427.630981,382.246552 429.774384,384.287811 C475.286957,427.631531 549.985596,427.711823 595.971436,384.451813 C598.483948,382.088226 600.738708,381.313690 603.974060,382.718170 C607.941040,384.440216 612.065552,385.799408 616.484192,387.457458 Z" />
+                    <path d="M513.762451,393.478210 C485.014496,393.558716 462.797516,380.619720 444.257141,360.478394 C430.584991,345.625702 420.460449,328.433716 413.129120,309.614502 C412.334167,307.573883 411.637939,305.636566 412.879089,303.420074 C416.547882,296.868347 416.612946,289.885590 415.659882,282.594055 C412.189301,256.041504 408.975739,229.455338 405.666656,202.881668 C405.271820,199.711014 404.625153,196.473251 402.891052,193.876495 C400.240143,189.906860 400.776123,186.258789 402.258606,182.097946 C418.269409,137.160980 450.922180,113.050758 497.312347,106.680489 C528.434448,102.406822 557.288208,109.256462 583.244568,127.087120 C604.247253,141.514893 617.744446,161.459091 624.910278,185.802170 C625.339600,187.260727 625.815430,188.825500 624.937378,190.170563 C619.369263,198.701065 619.707703,208.624237 618.472046,218.107269 C615.700195,239.378891 613.350281,260.705170 610.746216,281.999146 C609.823975,289.540619 609.606934,296.875854 613.247864,303.949585 C615.220276,307.781769 611.148010,316.842529 607.041748,318.152863 C589.448792,323.766815 571.357239,326.140839 552.926941,326.150940 C550.667480,326.152191 548.737000,325.226410 546.934143,323.939331 C542.154297,320.526947 536.860840,319.027740 530.955322,319.265686 C525.630798,319.480316 520.290710,319.271973 514.958435,319.334320 C501.830017,319.487854 491.460785,329.889862 491.043518,343.269806 C490.610962,357.141113 500.155640,368.361481 513.517700,368.899536 C521.140015,369.206451 528.815613,369.880615 536.460388,368.790009 C539.309937,368.383514 542.188538,367.779144 544.394836,366.016418 C548.197021,362.978546 552.411621,362.610718 557.031738,362.557190 C564.455750,362.471161 571.873047,361.801819 579.515076,361.366333 C574.205078,372.597900 542.517395,394.630249 513.762451,393.478210 Z" />
+                    <path d="M346.693176,182.979950 C353.287811,149.425095 368.330414,120.735664 392.425842,97.086304 C418.590546,71.405991 450.092163,56.483746 486.441559,51.373772 C524.885071,45.969406 561.729187,50.920551 595.843384,69.532654 C643.432373,95.496422 671.828430,135.660660 680.394226,189.436752 C681.179749,194.367996 682.712158,198.018860 687.216309,201.202194 C697.939514,208.780838 702.348022,219.804977 701.485474,232.910629 C700.512390,247.697403 698.397583,262.359924 696.277771,277.001923 C694.136719,291.789825 685.834473,301.900177 671.483887,306.747498 C669.776611,307.324158 668.028809,307.665405 666.759460,309.284668 C651.746704,328.436157 630.976318,337.989044 608.270203,344.390411 C589.200256,349.766663 569.684448,351.471527 549.994812,351.856964 C546.881531,351.917908 544.015625,352.217621 541.916199,354.853607 C541.613647,355.233521 541.156921,355.500885 540.745728,355.782532 C535.834717,359.145691 513.163818,359.470276 508.159454,356.255249 C503.674835,353.374084 500.901367,347.068634 501.864380,341.943512 C503.027618,335.752716 507.701538,330.763275 513.884155,330.154175 C520.668030,329.485809 527.527100,329.526611 534.333435,330.240723 C537.192322,330.540680 540.177124,331.376343 541.905945,333.675140 C544.499207,337.123413 548.002258,337.611298 551.666382,337.457977 C571.499756,336.628082 591.193970,334.781952 610.268555,328.765594 C621.136658,325.337677 631.276550,320.483612 640.899719,314.336334 C645.321411,311.511719 647.032043,307.843689 647.590332,302.974396 C650.923828,273.903931 654.349121,244.844025 657.758789,215.782349 C658.494446,209.512314 658.216492,202.867081 660.281189,197.061737 C664.814697,184.314056 659.811340,173.043335 655.453125,162.120941 C634.467651,109.528069 595.491638,77.991493 539.836182,68.920441 C494.902496,61.596867 452.839111,70.422371 416.370361,99.114319 C388.145569,121.320290 371.268066,150.738892 363.767639,185.691406 C363.525879,186.817978 363.155579,188.126968 363.491364,189.135849 C368.261139,203.466415 368.272339,218.529938 370.264984,233.271683 C373.427521,256.667542 376.040924,280.137268 379.013580,303.559631 C379.401825,306.618500 378.976196,308.272644 375.502655,308.543243 C352.971771,310.298370 332.575867,300.921875 329.517853,274.512756 C327.795959,259.641876 325.202820,244.863907 324.660278,229.872650 C324.268219,219.040192 327.922089,209.268814 336.663513,203.141739 C344.069916,197.950424 346.123077,191.393219 346.693176,182.979950 M340.178284,227.044083 C339.642303,234.716431 341.325409,242.182465 342.299530,249.713242 C342.623383,252.216919 343.684570,254.546143 346.540436,254.149307 C349.230957,253.775467 350.101318,251.404816 349.815125,248.813599 C348.925385,240.758575 348.103210,232.692719 346.986023,224.668488 C346.686981,222.520432 347.438019,219.954346 345.108337,217.968887 C342.139374,219.949020 340.896698,222.871735 340.178284,227.044083 M684.649902,244.218979 C685.199890,238.789719 686.318665,233.397110 685.899780,227.902664 C685.597473,223.937775 684.652832,220.244278 680.305725,217.403610 C678.426392,228.786377 676.958984,239.546127 676.358521,250.420364 C676.254395,252.307388 677.209656,253.678680 679.080200,254.041992 C681.203125,254.454330 682.713379,253.186279 683.345520,251.395248 C684.052979,249.391083 684.220459,247.196320 684.649902,244.218979 Z" />
+                    <path d="M573.666382,104.326355 C522.186890,81.357742 473.913605,85.954811 428.771545,119.471420 C423.151825,123.643898 417.530640,125.950256 410.753693,122.823051 C405.702698,120.492279 405.414917,118.863808 409.433197,114.930725 C431.338837,93.489418 457.567322,80.263054 487.810974,76.188705 C535.954041,69.702995 579.571533,79.812653 615.792969,114.160110 C621.046509,119.141815 620.610535,121.025566 613.687134,123.446762 C608.311157,125.326813 603.446167,124.092094 599.153015,120.697876 C591.284973,114.477303 583.033936,108.886368 573.666382,104.326355 Z" />
+                    <path d="M402.042969,260.237366 C403.085358,268.597717 403.870117,276.539307 405.059204,284.419891 C406.820007,296.089386 401.880829,304.649445 392.041626,306.829529 C388.477936,307.619110 386.807983,306.770477 386.379639,302.958893 C384.616180,287.266754 382.691498,271.592621 380.794952,255.915634 C378.619537,237.933441 376.404724,219.956024 374.225586,201.974274 C373.965668,199.829636 374.065033,197.613968 373.576508,195.529999 C372.407837,190.544403 374.801575,189.446198 379.162476,189.664551 C386.618713,190.037918 393.096985,194.994995 394.556305,202.938751 C396.235260,212.078110 397.055206,221.375534 398.239227,230.605484 C399.487091,240.333405 400.724335,250.062668 402.042969,260.237366 Z" />
+                    <path d="M643.779663,268.558899 C642.434326,280.054901 641.072083,291.106262 640.014893,302.186737 C639.592163,306.617432 637.969727,307.908691 633.573425,306.606689 C625.013550,304.071472 619.806458,297.112213 620.879395,288.225800 C623.945007,262.834259 627.198608,237.465454 630.378601,212.087723 C630.791687,208.790512 630.900024,205.418762 631.681152,202.211029 C633.721069,193.834137 641.352905,188.716873 649.626526,189.678253 C652.390442,189.999435 653.328674,191.164871 652.983826,193.935684 C649.906616,218.660278 646.907349,243.394547 643.779663,268.558899 Z" />
                   </svg>
                 )},
-                { value: 'bot', label: 'Bot', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                { value: 'bot', label: 'Trimite', icon: (
+                  <svg width="20" height="20" viewBox="0 0 512 512" fill="currentColor" stroke="none">
+                    <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-52.1 60.9c-6.1 7.1-15.6 9.9-24.5 7.1S192 484.6 192 475.2V416c0-4 1.5-7.8 4.2-10.7L365.6 219.6c7.3-8 6.9-20.1-.8-27.6s-19.7-8.1-27.9-.9L130.8 328.4l-109.7-44.1c-9.5-3.8-15.8-12.9-16.1-23.1s5.5-19.7 14.8-24.1l460.9-224c11.6-5.6 25-4.4 35.1 2.3z" />
                   </svg>
                 )},
-                { value: 'lightning', label: 'Energie', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor"/>
+                { value: 'lightning', label: 'Conversație', icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <ellipse cx="12" cy="10.3" rx="9" ry="7.3" />
+                    <path d="M8 16.3c-.4 2-1.7 3.5-1.7 3.5s2.3-.3 4-1.8" />
                   </svg>
                 )},
-                { value: 'heart', label: 'Prietenos', icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" fill="currentColor"/>
+                { value: 'heart', label: 'Sclipici AI', icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="none">
+                    <path d="M12 2.5c.6 4.3 2 7.1 5.2 8.5-3.2 1.4-4.6 4.2-5.2 8.5-.6-4.3-2-7.1-5.2-8.5 3.2-1.4 4.6-4.2 5.2-8.5z" fill="currentColor" />
+                    <path d="M18.5 3c.25 1.7.8 2.8 2 3.4-1.2.6-1.75 1.7-2 3.4-.25-1.7-.8-2.8-2-3.4 1.2-.6 1.75-1.7 2-3.4z" fill="currentColor" opacity="0.65" />
                   </svg>
                 )},
               ].map((item) => (
@@ -1346,9 +1456,11 @@ export default function Settings() {
                   }`}
                 >
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    config.bubble_icon === item.value
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                    item.selfContained
+                      ? ''
+                      : config.bubble_icon === item.value
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
                   }`}>
                     {item.icon}
                   </div>
@@ -1362,6 +1474,7 @@ export default function Settings() {
             </div>
           </Accordion>
 
+          {/* Sectiunea cu functiile widget-ului (emoji, atasari, voce) */}
           <Accordion title="Functionalitati" icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
             <div className="space-y-3">
               {[
@@ -1392,6 +1505,7 @@ export default function Settings() {
             </div>
           </Accordion>
 
+          {/* Sectiunea pentru pozitia widget-ului pe pagina */}
           <Accordion title="Pozitie widget" icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -1416,12 +1530,13 @@ export default function Settings() {
             </div>
           </Accordion>
 
-          {/* Save */}
+          {/* Salvare */}
           <button
             onClick={handleSave}
             disabled={saving}
             className="w-full bg-gradient-to-r from-primary to-primary-600 text-white px-6 py-3 rounded-xl hover:from-primary-600 hover:to-primary-700 disabled:opacity-50 font-medium shadow-lg shadow-primary/20 transition-all duration-200 flex items-center justify-center gap-2"
           >
+            {/* In timpul salvarii butonul arata un indicator */}
             {saving ? (
               <>
                 <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -1434,7 +1549,7 @@ export default function Settings() {
           </button>
         </div>
 
-        {/* Right: Preview */}
+        {/* Dreapta: previzualizarea */}
         <div>
           <div className="sticky top-8">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
@@ -1443,12 +1558,9 @@ export default function Settings() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
               Live Preview
-              <span className="text-xs font-normal text-gray-400 ml-1">
-                ({config.widget_theme === 'livechat' ? 'LiveChat' : config.widget_theme === 'modern' ? 'Modern' : 'Classic'})
-              </span>
             </h3>
             <div className="relative bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-2xl h-[630px] overflow-hidden border border-gray-200 dark:border-gray-700">
-              {/* Fake browser bar */}
+              {/* Bara de browser simulata */}
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-2">
                 <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-red-400" />
@@ -1458,14 +1570,14 @@ export default function Settings() {
                 <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-md px-3 py-1 text-xs text-gray-400 ml-2">your-website.com</div>
               </div>
 
-              {/* Content area */}
+              {/* Zona de continut */}
               <div className="p-6">
                 <div className="h-3 bg-gray-300/50 dark:bg-gray-600/50 rounded w-3/4 mb-3" />
                 <div className="h-3 bg-gray-300/50 dark:bg-gray-600/50 rounded w-1/2 mb-3" />
                 <div className="h-3 bg-gray-300/50 dark:bg-gray-600/50 rounded w-2/3" />
               </div>
 
-              {/* Theme-specific preview */}
+              {/* Previzualizarea specifica temei alese */}
               {renderPreview()}
             </div>
           </div>
