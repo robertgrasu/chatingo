@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import { useBot } from '../BotContext';
-import { createBot, deleteBot } from '../api';
+import { createBot, deleteBot, isDemoError } from '../api';
 import { useToast } from '../ToastContext';
 import PageHeader from '../components/PageHeader';
 import ConfirmModal from '../components/ConfirmModal';
 import { formatDate } from '../utils';
 
+// Pagina cu botii echipei: creare, selectare si stergere
 export default function Bots() {
+  // Botii echipei si botul selectat, din contextul botilor
   const { bots, selectedBotId, selectBot, refreshBots, loading } = useBot();
   const { addToast } = useToast();
+  // Starea ferestrei de creare si a celei de stergere
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // Datele formularului pentru un bot nou
   const [form, setForm] = useState({ bot_name: '', welcome_message: 'Buna! Cu ce te pot ajuta?', primary_color: '#6366f1' });
 
+  // Creeaza un bot nou
   const handleCreate = async () => {
+    // Numele botului este obligatoriu
     if (!form.bot_name.trim()) return;
     setCreating(true);
     try {
@@ -25,25 +31,29 @@ export default function Bots() {
       refreshBots();
       setShowCreate(false);
       setForm({ bot_name: '', welcome_message: 'Buna! Cu ce te pot ajuta?', primary_color: '#6366f1' });
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la crearea botului', 'error');
     } finally {
       setCreating(false);
     }
   };
 
+  // Sterge botul ales dupa confirmare
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
       await deleteBot(deleteTarget.bot_id);
       addToast(`Bot "${deleteTarget.bot_name}" sters`, 'success');
+      // Daca s-a sters botul selectat, se alege primul bot ramas
       if (selectedBotId === deleteTarget.bot_id) {
         const remaining = bots.filter((b) => b.bot_id !== deleteTarget.bot_id);
         if (remaining.length > 0) selectBot(remaining[0].bot_id);
       }
       refreshBots();
-    } catch {
+    } catch (err) {
+      if (isDemoError(err)) return;
       addToast('Eroare la stergerea botului', 'error');
     } finally {
       setDeleting(false);
@@ -51,6 +61,7 @@ export default function Bots() {
     }
   };
 
+  // Culorile din care se poate alege culoarea botului
   const colors = ['#6366f1', '#ef4444', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316'];
 
   return (
@@ -71,7 +82,7 @@ export default function Bots() {
         }
       />
 
-      {/* Create Bot Modal */}
+      {/* Fereastra de creare, vizibila doar cand este deschisa */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-dark-light rounded-2xl w-full max-w-md mx-4 shadow-2xl">
@@ -102,6 +113,7 @@ export default function Bots() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Culoare Principala</label>
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* Cate o mostra pentru fiecare culoare */}
                   {colors.map((c) => (
                     <button
                       key={c}
@@ -138,7 +150,7 @@ export default function Bots() {
         </div>
       )}
 
-      {/* Bot Cards Grid */}
+      {/* Cat timp se incarca apar placeholder-e, apoi cardurile botilor */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[1, 2, 3].map((i) => (
@@ -151,6 +163,7 @@ export default function Bots() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Fiecare bot, cu butoane de selectare si stergere */}
           {bots.map((bot) => (
             <div
               key={bot.bot_id}
