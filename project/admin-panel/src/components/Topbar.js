@@ -5,6 +5,7 @@ import { useBot } from '../BotContext';
 import { useAuth } from '../AuthContext';
 import { useNotifications } from '../NotificationContext';
 
+// Afiseaza in forma scurta cat timp a trecut de la un moment dat
 function timeAgo(ts) {
   const sec = Math.floor((Date.now() - ts) / 1000);
   if (sec < 60) return 'Chiar acum';
@@ -16,6 +17,7 @@ function timeAgo(ts) {
   return `${days}z`;
 }
 
+// Paginile in care se poate cauta din bara de sus, cu descriere, ruta si cuvinte cheie
 const SEARCH_ITEMS = [
   { label: 'Dashboard', desc: 'Statistici si sumar general', route: '/', category: 'Pagini', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4', keywords: 'acasa home statistici stats overview' },
   { label: 'Knowledge Base', desc: 'Documente si categorii', route: '/knowledge', category: 'Pagini', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', keywords: 'documente fisiere upload knowledge baza cunostinte' },
@@ -32,41 +34,48 @@ const SEARCH_ITEMS = [
   { label: 'Setari Cont', desc: 'Profil, parola, email', route: '/account', category: 'Cont', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', keywords: 'cont profil parola schimba email utilizator admin' },
 ];
 
+// Bara de sus: cautare globala, selectorul de bot, notificarile, tema si meniul profilului
 export default function Topbar({ sidebarCollapsed }) {
+  // Datele din contexte: tema, botii, utilizatorul si notificarile
   const { dark, toggle } = useTheme();
   const { selectedBotId, selectBot, bots } = useBot();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  // Starea cautarii: focus, text si rezultatul selectat cu tastatura
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
+  // Starea meniurilor deschise: profil, selector de bot, notificari si filtrul lor
   const [profileOpen, setProfileOpen] = useState(false);
   const [botDropOpen, setBotDropOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState('all');
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+  // Referintele folosite pentru a inchide meniurile la click in afara lor
   const profileRef = useRef(null);
   const botDropRef = useRef(null);
   const notifRef = useRef(null);
   const searchRef = useRef(null);
   const searchInputRef = useRef(null);
 
+  // Botul selectat, afisat in selector
   const currentBot = bots.find((b) => b.bot_id === selectedBotId);
 
-  // Profile from auth context (not localStorage)
+  // Profilul vine din contextul de autentificare, nu din localStorage
   const profileName = user?.username || 'Admin';
   const profileEmail = user?.email || '';
   const profileAvatar = null;
 
   const { notifications, unreadCount, markAsRead, markAllRead } = useNotifications();
 
+  // Primele 5 notificari dupa filtrul ales (toate, citite sau necitite)
   const filteredNotifs = notifications.filter((n) => {
     if (notifFilter === 'read') return n.read;
     if (notifFilter === 'unread') return !n.read;
     return true;
   }).slice(0, 5);
 
-  // Search
+  // Rezultatele cautarii globale: primele 8 pagini care contin toate cuvintele scrise
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
@@ -76,11 +85,13 @@ export default function Topbar({ sidebarCollapsed }) {
     }).slice(0, 8);
   }, [searchQuery]);
 
+  // Lista de rezultate apare cat timp campul are focus si text
   const showSearch = searchFocused && searchQuery.trim().length > 0;
 
+  // La fiecare cautare noua selectia revine la primul rezultat
   useEffect(() => { setSelectedIdx(0); }, [searchResults]);
 
-  // Ctrl+K shortcut
+  // Scurtatura Ctrl+K pentru cautare
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -92,6 +103,7 @@ export default function Topbar({ sidebarCollapsed }) {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
+  // Navigare cu tastatura in rezultate: sageti, Enter pentru a deschide pagina si Escape pentru a inchide
   const handleSearchKey = (e) => {
     if (!showSearch && e.key !== 'Escape') return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, searchResults.length - 1)); }
@@ -105,6 +117,7 @@ export default function Topbar({ sidebarCollapsed }) {
     else if (e.key === 'Escape') { setSearchQuery(''); searchInputRef.current?.blur(); }
   };
 
+  // Click in afara unui meniu il inchide
   useEffect(() => {
     const handler = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
@@ -120,7 +133,7 @@ export default function Topbar({ sidebarCollapsed }) {
   return (
     <header className={`h-[60px] fixed top-0 right-0 ${sidebarCollapsed ? 'left-[72px]' : 'left-[226px]'} z-40 bg-white dark:bg-dark border-b-2 border-gray-100 dark:border-gray-800/50 transition-all duration-300`}>
       <div className="h-full flex items-center justify-between px-5">
-        {/* Search */}
+        {/* Cautare */}
         <div ref={searchRef} className={`relative flex items-center transition-all duration-200 ${searchFocused ? 'w-96' : 'w-64'}`}>
           <svg className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -138,9 +151,10 @@ export default function Topbar({ sidebarCollapsed }) {
             className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all duration-200"
           />
 
-          {/* Search Results Dropdown */}
+          {/* Lista de rezultate apare doar cand se cauta ceva */}
           {showSearch && (
             <div className="absolute left-0 top-full mt-2 w-full bg-white dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl shadow-gray-200/50 dark:shadow-black/30 overflow-hidden z-50 animate-scale-in">
+              {/* Mesaj cand nu exista rezultate, altfel lista grupata pe categorii */}
               {searchResults.length === 0 ? (
                 <div className="px-4 py-6 text-center">
                   <svg className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +164,7 @@ export default function Topbar({ sidebarCollapsed }) {
                 </div>
               ) : (
                 <>
-                  {/* Group results by category */}
+                  {/* Rezultatele sunt grupate pe categorii */}
                   {(() => {
                     let lastCat = '';
                     let globalIdx = -1;
@@ -205,9 +219,9 @@ export default function Topbar({ sidebarCollapsed }) {
           )}
         </div>
 
-        {/* Right side */}
+        {/* Partea din dreapta */}
         <div className="flex items-center gap-2">
-          {/* Bot Selector */}
+          {/* Selectorul de bot */}
           <div ref={botDropRef} className="relative">
             <button
               onClick={() => setBotDropOpen(!botDropOpen)}
@@ -222,6 +236,7 @@ export default function Topbar({ sidebarCollapsed }) {
               </svg>
             </button>
 
+            {/* Lista de boti, vizibila doar cand selectorul este deschis */}
             {botDropOpen && (
               <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 py-1.5 animate-scale-in max-h-72 overflow-y-auto">
                 <div className="px-3 py-1.5">
@@ -253,15 +268,16 @@ export default function Topbar({ sidebarCollapsed }) {
             )}
           </div>
 
-          {/* Divider */}
+          {/* Separator */}
           <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
 
-          {/* Dark mode toggle */}
+          {/* Butonul pentru tema intunecata */}
           <button
             onClick={toggle}
             className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-lighter transition-colors duration-200"
             title={dark ? 'Light mode' : 'Dark mode'}
           >
+            {/* Iconita se schimba dupa tema curenta: soare pentru intunecat, luna pentru luminos */}
             {dark ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="5" fill="currentColor" />
@@ -275,7 +291,7 @@ export default function Topbar({ sidebarCollapsed }) {
             )}
           </button>
 
-          {/* Notifications */}
+          {/* Notificari */}
           <div ref={notifRef} className="relative">
             <button
               onClick={() => setNotifOpen(!notifOpen)}
@@ -285,6 +301,7 @@ export default function Topbar({ sidebarCollapsed }) {
                 <path opacity="0.3" d="M18.75 9V9.704C18.75 10.432 18.965 11.144 19.365 11.752L20.06 12.808C20.919 14.116 20.265 15.88 18.756 16.255C14.326 17.33 9.674 17.33 5.245 16.255C3.735 15.88 3.081 14.116 3.94 12.808L4.635 11.752C5.035 11.144 5.25 10.432 5.25 9.704V9C5.25 5.272 8.272 2.25 12 2.25C15.728 2.25 18.75 5.272 18.75 9Z" fill="currentColor" />
                 <path d="M7.5 16.5C8.156 19.443 9.873 21.75 12 21.75C14.127 21.75 15.844 19.443 16.5 16.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
+              {/* Insigna cu numarul de notificari necitite */}
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 w-4 h-4 bg-danger rounded-full text-[9px] font-bold text-white flex items-center justify-center">
                   {unreadCount}
@@ -292,12 +309,14 @@ export default function Topbar({ sidebarCollapsed }) {
               )}
             </button>
 
+            {/* Panoul de notificari, vizibil doar cand este deschis */}
             {notifOpen && (
               <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 animate-scale-in z-50">
-                {/* Header */}
+                {/* Antet */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                   <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Notificari</h4>
                   <div className="flex items-center gap-2">
+                    {/* Butonul pentru marcarea tuturor ca citite apare doar daca exista necitite */}
                     {unreadCount > 0 && (
                       <button onClick={markAllRead} className="text-[10px] text-primary hover:text-primary-600 font-medium">
                         Citeste tot
@@ -314,8 +333,10 @@ export default function Topbar({ sidebarCollapsed }) {
                           <circle cx="16" cy="2" r="2" fill="currentColor" />
                         </svg>
                       </button>
+                      {/* Meniul cu filtrele de notificari */}
                       {notifMenuOpen && (
                         <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-dark border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+                          {/* Cate un buton pentru fiecare filtru */}
                           {['all', 'unread', 'read'].map((f) => (
                             <button
                               key={f}
@@ -333,8 +354,9 @@ export default function Topbar({ sidebarCollapsed }) {
                   </div>
                 </div>
 
-                {/* List */}
+                {/* Lista */}
                 <div className="max-h-80 overflow-y-auto">
+                  {/* Mesaj cand nu exista notificari, altfel lista lor */}
                   {filteredNotifs.length === 0 ? (
                     <div className="py-8 text-center">
                       <svg className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,8 +411,8 @@ export default function Topbar({ sidebarCollapsed }) {
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{notif.title}</p>
                             {!notif.read && <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />}
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{notif.desc}</p>
-                          <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">{timeAgo(notif.time)}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{notif.desc}</p>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1">{timeAgo(notif.time)}</p>
                         </div>
                       </button>
                       );
@@ -398,7 +420,7 @@ export default function Topbar({ sidebarCollapsed }) {
                   )}
                 </div>
 
-                {/* Footer */}
+                {/* Subsol */}
                 <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-2.5 text-center">
                   <button
                     onClick={() => { navigate('/notifications'); setNotifOpen(false); }}
@@ -411,10 +433,10 @@ export default function Topbar({ sidebarCollapsed }) {
             )}
           </div>
 
-          {/* Divider */}
+          {/* Separator */}
           <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
 
-          {/* User profile */}
+          {/* Profilul utilizatorului */}
           <div ref={profileRef} className="relative">
             <button
               onClick={() => setProfileOpen(!profileOpen)}
@@ -428,14 +450,21 @@ export default function Topbar({ sidebarCollapsed }) {
                 )}
               </div>
               <div className="text-left hidden sm:block">
-                <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight">{profileName}</p>
-                <p className="text-[10px] text-gray-400 leading-tight">Administrator</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight flex items-center gap-1.5">
+                  {profileName}
+                  {/* Eticheta demo apare doar pentru contul demo */}
+                  {user?.role === 'demo' && (
+                    <span className="text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-wide">Demo</span>
+                  )}
+                </p>
+                {user?.role !== 'demo' && <p className="text-[10px] text-gray-400 leading-tight capitalize">{user?.role || 'admin'}</p>}
               </div>
               <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
+            {/* Meniul profilului, vizibil doar cand este deschis */}
             {profileOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 py-1.5 animate-scale-in">
                 <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
