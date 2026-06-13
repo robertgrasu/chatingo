@@ -4,10 +4,12 @@ import { getStats } from '../api';
 import { useBot } from '../BotContext';
 
 
+// Iconita in doua tonuri folosita in meniul lateral
 const DuoIcon = ({ children }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">{children}</svg>
 );
 
+// Iconitele meniului, desenate ca SVG in doua tonuri
 const icons = {
   dashboard: (
     <DuoIcon>
@@ -89,13 +91,14 @@ const icons = {
   ),
 };
 
+// Structura meniului: sectiuni, fiecare cu linkurile ei
 const menuItems = [
   {
     section: 'General',
     items: [
       { to: '/', label: 'Dashboard', icon: icons.dashboard },
-      { to: '/knowledge', label: 'Knowledge Base', icon: icons.bookContent },
-      { to: '/quick-replies', label: 'Raspunsuri Rapide', icon: icons.bolt },
+      { to: '/knowledge', label: 'Bază de cunoștințe', icon: icons.bookContent },
+      { to: '/quick-replies', label: 'Răspunsuri Rapide', icon: icons.bolt },
     ],
   },
   {
@@ -109,48 +112,66 @@ const menuItems = [
   {
     section: 'Configurare',
     items: [
-      { to: '/bots', label: 'Botii Mei', icon: icons.bot },
-      { to: '/behavior', label: 'Comportament AI', icon: icons.brain },
-      { to: '/settings', label: 'Widget Config', icon: icons.palette },
-      { to: '/integration', label: 'Integration', icon: icons.codeAlt },
+      { to: '/bots', label: 'Boții Mei', icon: icons.bot },
+      { to: '/behavior', label: 'Comportament Bot', icon: icons.brain },
       { to: '/users', label: 'Utilizatori', icon: icons.users },
+      { to: '/settings', label: 'Setări Widget', icon: icons.palette },
+      { to: '/integration', label: 'Integrare', icon: icons.codeAlt },
     ],
   },
 ];
 
+// Meniul lateral cu sectiunile panoului; arata numarul de conversatii ale botului selectat si se poate restrange
 export default function Sidebar({ collapsed, setCollapsed }) {
   const { selectedBotId } = useBot();
 
+  // Numarul total de conversatii afisat in meniu
   const [convCount, setConvCount] = useState(0);
 
+  // Numarul de conversatii se reincarca cand se schimba botul selectat
   useEffect(() => {
     getStats(selectedBotId).then((res) => setConvCount(res.data.total_conversations)).catch(() => {});
   }, [selectedBotId]);
 
+  // Meniul este fix pe stanga si isi schimba latimea cand este restrans
   return (
     <nav className={`${collapsed ? 'w-[72px]' : 'w-[226px]'} fixed z-50 flex-none border-r border-gray-200/80 dark:border-gray-800/60 transition-all duration-300 bg-white dark:bg-dark h-full`}>
       <div className="h-full flex flex-col">
 
         {/* Logo */}
         <div className="px-3.5 pt-4 pb-2">
-          <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2.5 px-1'}`}>
-            <div className="w-9 h-9 bg-gradient-to-br from-primary to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path opacity="0.35" d="M16 14c0 3.87-3.13 7-7 7-1.08 0-2.11-.25-3.02-.68L2 21.5l1.18-3.98A6.95 6.95 0 0 1 2 14c0-3.87 3.13-7 7-7s7 3.13 7 7Z"/>
-                <path d="M17 3l1.2 2.8L21 7l-2.8 1.2L17 11l-1.2-2.8L13 7l2.8-1.2L17 3Z"/>
-                <path d="M21 12l.7 1.6 1.8.7-1.8.7-.7 1.6-.7-1.6-1.8-.7 1.8-.7.7-1.6Z" opacity="0.6"/>
+          <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-1'}`}>
+            {/* Varianta pentru tema luminoasa */}
+            <div className="flex dark:hidden items-center justify-center flex-shrink-0"
+              style={{ width: '40px', height: '40px', borderRadius: '11px', background: '#2563eb', boxShadow: '4px 4px 0 #1e40af' }}>
+              <svg width="29" height="29" viewBox="0 0 40 40" fill="none">
+                <path d="M8 12C8 9 10 7 13 7H23C26 7 28 9 28 12V15C28 18 26 20 23 20H15L11 24V20H10C8 20 8 18 8 18V12Z"
+                  stroke="white" strokeWidth="2.5" strokeLinejoin="round" />
+                <path d="M14 20V22C14 25 16 27 19 27H27L31 31V27H30C32 27 34 25 34 22V18C34 15 32 13 29 13H28"
+                  stroke="white" strokeWidth="2.5" strokeOpacity="0.45" strokeLinejoin="round" />
               </svg>
             </div>
+            {/* Varianta pentru tema intunecata */}
+            <div className="hidden dark:flex items-center justify-center flex-shrink-0"
+              style={{ width: '40px', height: '40px', borderRadius: '11px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', boxShadow: '4px 4px 0 rgba(0,0,0,0.25)' }}>
+              <svg width="29" height="29" viewBox="0 0 40 40" fill="none">
+                <path d="M8 12C8 9 10 7 13 7H23C26 7 28 9 28 12V15C28 18 26 20 23 20H15L11 24V20H10C8 20 8 18 8 18V12Z"
+                  stroke="white" strokeWidth="2.5" strokeLinejoin="round" />
+                <path d="M14 20V22C14 25 16 27 19 27H27L31 31V27H30C32 27 34 25 34 22V18C34 15 32 13 29 13H28"
+                  stroke="white" strokeWidth="2.5" strokeOpacity="0.45" strokeLinejoin="round" />
+              </svg>
+            </div>
+            {/* Titlul sectiunii apare doar cand meniul este extins */}
             {!collapsed && (
-              <div className="min-w-0">
-                <span className="text-[15px] font-bold text-gray-900 dark:text-white tracking-tight">AiChat</span>
-                <span className="text-[10px] text-gray-400 font-medium ml-1.5">Pro</span>
-              </div>
+              <span className="text-gray-900 dark:text-white"
+                style={{ fontFamily: "'Figtree', sans-serif", fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.6px' }}>
+                Chatingo
+              </span>
             )}
           </div>
         </div>
 
-        {/* Collapse toggle */}
+        {/* Butonul de restrangere a meniului */}
         <div className="flex items-center gap-2.5 py-2 pe-3">
           <div className="h-px bg-gray-100 dark:bg-gray-800/60 flex-1" />
           <button onClick={() => setCollapsed(!collapsed)} className="shrink-0 text-gray-300 dark:text-gray-600 hover:text-primary duration-200">
@@ -161,15 +182,19 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           </button>
         </div>
 
-        {/* Navigation */}
+        {/* Navigarea */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 pt-0.5 pb-4 space-y-5">
+          {/* Fiecare sectiune a meniului, cu titlu si linkuri */}
           {menuItems.map((group) => (
             <div key={group.section}>
+              {/* Eticheta si insigna apar doar cand meniul este extins */}
               {!collapsed && (
                 <h2 className="pt-1 pb-1.5 text-gray-400 dark:text-gray-500 text-[10px] font-semibold uppercase tracking-widest px-2.5">{group.section}</h2>
               )}
+              {/* Meniul restrans foloseste o linie in locul titlului */}
               {collapsed && <div className="h-px bg-gray-100 dark:bg-gray-800/40 mx-2 mb-2" />}
               <div className="flex flex-col gap-0.5">
+                {/* Linkurile sectiunii; cel activ este evidentiat */}
                 {group.items.map((link) => (
                   <NavLink
                     key={link.to}
@@ -178,13 +203,16 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                     className={({ isActive }) =>
                       `group flex items-center ${collapsed ? 'justify-center' : 'gap-2.5 px-2.5'} py-[7px] rounded-lg text-[13px] font-medium transition-all duration-150 ${
                         isActive
-                          ? 'bg-primary/[0.08] text-primary dark:bg-primary/10'
+                          ? 'bg-gray-100 text-gray-900 dark:bg-gray-800/70 dark:text-white'
                           : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/40 hover:text-gray-800 dark:hover:text-gray-200'
                       }`
                     }
                     title={collapsed ? link.label : undefined}
                   >
-                    <span className="flex-shrink-0 transition-colors duration-150">{link.icon}</span>
+                    {({ isActive }) => null}
+                    <span className={`flex-shrink-0 transition-all duration-150 rounded-md p-1 -m-1 ${
+                      false ? 'bg-primary/15' : ''
+                    }`}>{link.icon}</span>
                     {!collapsed && (
                       <>
                         <span className="flex-1 truncate">{link.label}</span>
