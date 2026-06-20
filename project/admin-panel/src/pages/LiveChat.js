@@ -1,16 +1,63 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
 import { useBot } from '../BotContext';
 import { useToast } from '../ToastContext';
 import {
   connectOperatorWs, getLiveChatConversations, getLiveChatMessages,
-  getContactSubmissions, markContactRead, deleteContact,
+  getContactSubmissions, markContactRead, deleteContact, isDemoError,
 } from '../api';
 import PageHeader from '../components/PageHeader';
 import { timeAgo } from '../utils';
 
-// ── Helpers ────────────────────────────────────────────
+// Transforma textul ingrosat (**text**) si cursiv (*text*) in elemente React
+function parseInline(text) {
+  const parts = [];
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[2]) parts.push(<strong key={`b${m.index}`} style={{ fontWeight: 600 }}>{m[2]}</strong>);
+    else if (m[3]) parts.push(<em key={`i${m.index}`}>{m[3]}</em>);
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts.length > 0 ? parts : text;
+}
 
+// Randeaza mesajele botului: paragrafe, liste si text formatat
+function renderMarkdown(content) {
+  if (!content) return null;
+  const lines = content.split('\n');
+  const result = [];
+  // Elementele listei curente si tipul ei (ol sau ul)
+  let items = [], listType = null;
+  // Aduna elementele strense pana acum intr-o singura lista si o adauga la rezultat
+  const flush = () => {
+    if (!items.length) return;
+    const Tag = listType === 'ol' ? 'ol' : 'ul';
+    result.push(
+      <Tag key={`l${result.length}`} style={{ margin: '4px 0', paddingLeft: '18px', listStyleType: listType === 'ol' ? 'decimal' : 'disc' }}>
+        {items.map((it, i) => <li key={i} style={{ marginBottom: '2px' }}>{parseInline(it)}</li>)}
+      </Tag>
+    );
+    items = []; listType = null;
+  };
+  // Fiecare linie este element numerotat, element cu buline sau paragraf
+  lines.forEach((line, idx) => {
+    const t = line.trim();
+    const ol = t.match(/^\d+[.)]\s+(.+)/);
+    const ul = t.match(/^[-*]\s+(.+)/);
+    if (ol) { if (listType !== 'ol') flush(); listType = 'ol'; items.push(ol[1]); }
+    else if (ul) { if (listType !== 'ul') flush(); listType = 'ul'; items.push(ul[1]); }
+    else { flush(); result.push(t === '' ? <div key={`s${idx}`} style={{ height: '6px' }} /> : <div key={`p${idx}`}>{parseInline(t)}</div>); }
+  });
+  flush();
+  return result;
+}
+
+// ── Functii ajutatoare ───────────────────────────────
+
+// Serverul trimite data UTC fara sufixul Z, deci se adauga pentru ca browserul sa o interpreteze corect
 function toUTC(dateStr) {
   if (!dateStr) return null;
   let s = String(dateStr);
@@ -19,17 +66,19 @@ function toUTC(dateStr) {
   return new Date(s);
 }
 
+// Formateaza data ca ora
 function formatTime(dateStr) {
   const d = toUTC(dateStr);
   return d && !isNaN(d) ? d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }) : '';
 }
 
+// Formateaza data pentru separatorul dintre zile din conversatie
 function formatDate(dateStr) {
   const d = toUTC(dateStr);
   return d && !isNaN(d) ? d.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 }
 
-// Tiny inline notification beep (base64-encoded short beep)
+// Sunet scurt de notificare, codat base64 direct in cod
 const BEEP_DATA = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACA' +
   'f39/f4CAgICAgH9/f3+AgICAgIB/f39/gICAgICAgH9/f3+AgICAgIB/f39/gICBgYGBgH9+fn5/' +
   'gIGBgYGAf35+fn+AgYGBgYB/fn5+f4CBgYGBgH9+fn5/gIGCgoGAf35+fn+AgYKCgYB/fn5+f4CB' +
@@ -44,12 +93,14 @@ const BEEP_DATA = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEA
   'eXl6fICEjo+OhH56eXp8gISPj46Efnl5enyAhI+Qj4R9eXl6e4CEj5CPhH15eXp7gIWQkI+EfXl5' +
   'enuAhZCQj4R9eXl6e4CFkJGQhH15eHp7gIWQkZCEfXl4enuAhZCRkIR9eXh6e4CFkZGQhH14eHp7';
 
+// Reda un sunet scurt cand apare o conversatie noua in asteptare
 function playNotificationSound() {
   try { new Audio(BEEP_DATA).play().catch(() => {}); } catch {}
 }
 
-// ── Canned responses ───────────────────────────────────
+// ── Raspunsuri predefinite ───────────────────────────
 
+// Raspunsurile predefinite pe care operatorul le poate insera cu un click
 const CANNED_RESPONSES = [
   { label: 'Salut', text: 'Buna ziua! Cu ce va pot ajuta?' },
   { label: 'Asteptati', text: 'Va rog asteptati un moment, verific informatiile.' },
@@ -59,17 +110,19 @@ const CANNED_RESPONSES = [
   { label: 'Revenire', text: 'Revin imediat cu un raspuns.' },
 ];
 
-// ── Main component ─────────────────────────────────────
+// ── Componenta principala ─────────────────────────────
 
+// Pagina de live chat a operatorului: conversatii in asteptare si live, mesaje in timp real prin WebSocket si mesajele din formularul de contact
 export default function LiveChat() {
+  // Token-ul operatorului, botul selectat si mesajele temporare
   const { accessToken } = useAuth();
   const { currentBot } = useBot();
   const { addToast } = useToast();
 
-  // Tab: 'chat' | 'contacts'
+  // Tabul activ: chat sau contacts
   const [activeTab, setActiveTab] = useState('chat');
 
-  // Chat state
+  // Starea chat-ului
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -78,25 +131,29 @@ export default function LiveChat() {
   const [visitorTyping, setVisitorTyping] = useState(false);
   const [showCanned, setShowCanned] = useState(false);
 
-  // Contact submissions
+  // Mesajele din formularul de contact
   const [contacts, setContacts] = useState([]);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [selectedContact, setSelectedContact] = useState(null);
 
+  // Referintele: conexiunea WebSocket, sfarsitul listei de mesaje, cronometrele si campul de text
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const reconnectRef = useRef(null);
   const visitorTypingTimeout = useRef(null);
   const textareaRef = useRef(null);
 
-  // Handle WS messages — use ref to avoid stale closure
+  // Referinta spre handler-ul WebSocket, ca socket-ul sa foloseasca mereu versiunea cea mai noua
   const handleWsMessageRef = useRef(null);
+  // Proceseaza evenimentele primite de la server: conversatii noi, mesaje ale vizitatorilor, preluari, inchideri si transferuri
   const handleWsMessage = useCallback((data) => {
     switch (data.type) {
+      // La conectare serverul trimite conversatiile existente
       case 'init':
         setConversations(data.conversations || []);
         break;
 
+      // O conversatie noua in asteptare: se adauga in lista, suna si apare o notificare din browser
       case 'new_waiting_conversation':
         setConversations(prev => {
           const exists = prev.find(c => c.conversation_id === data.conversation_id);
@@ -111,6 +168,7 @@ export default function LiveChat() {
         }
         break;
 
+      // Mesaj nou de la vizitator: se adauga in conversatie si creste contorul
       case 'visitor_message':
         setVisitorTyping(false);
         setMessages(prev => [...prev, {
@@ -125,12 +183,14 @@ export default function LiveChat() {
         playNotificationSound();
         break;
 
+      // Vizitatorul scrie; indicatorul dispare dupa 3 secunde fara semnal nou
       case 'visitor_typing':
         setVisitorTyping(true);
         clearTimeout(visitorTypingTimeout.current);
         visitorTypingTimeout.current = setTimeout(() => setVisitorTyping(false), 3000);
         break;
 
+      // Un alt operator a preluat conversatia, deci devine live
       case 'conversation_accepted':
         setConversations(prev => prev.map(c =>
           c.conversation_id === data.conversation_id
@@ -139,6 +199,7 @@ export default function LiveChat() {
         ));
         break;
 
+      // Conversatia a fost inchisa sau predata botului, deci iese din lista
       case 'conversation_closed_update':
       case 'conversation_transferred':
         setConversations(prev => prev.filter(c => c.conversation_id !== data.conversation_id));
@@ -150,34 +211,38 @@ export default function LiveChat() {
     }
   }, [selected]);
 
-  // Scroll to bottom
+  // Derulare automata la ultimul mesaj
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, visitorTyping]);
 
-  // Request notification permission
+  // Se cere permisiunea pentru notificarile din browser
   useEffect(() => {
     if (Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
 
+  // Referinta primeste mereu cea mai noua versiune a handler-ului
   handleWsMessageRef.current = handleWsMessage;
 
-  // Keep accessToken in a ref
+  // Token-ul de acces este tinut intr-o referinta, ca reconectarea sa nu depinda de el
   const accessTokenRef = useRef(accessToken);
   accessTokenRef.current = accessToken;
 
-  // Connect WebSocket
+  // Conectarea la WebSocket, cu reconectare automata
   const connectWs = useCallback(() => {
     const token = accessTokenRef.current;
+    // Fara token nu se poate conecta
     if (!token) return;
+    // Nu se deschide o a doua conexiune
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
 
     const ws = connectOperatorWs(
       token,
       (data) => handleWsMessageRef.current?.(data),
       () => {
+        // La inchiderea conexiunii se incearca reconectarea dupa 3 secunde
         setWsConnected(false);
         reconnectRef.current = setTimeout(connectWs, 3000);
       }
@@ -187,6 +252,7 @@ export default function LiveChat() {
     wsRef.current = ws;
   }, []);
 
+  // Conexiunea se deschide la pornire si se inchide la iesirea din pagina
   useEffect(() => {
     connectWs();
     return () => {
@@ -195,14 +261,16 @@ export default function LiveChat() {
     };
   }, [connectWs]);
 
-  // Polling fallback
+  // Verificare periodica, folosita cand WebSocket-ul nu merge
   useEffect(() => {
+    // Din 5 in 5 secunde se aduc conversatiile de pe server si se combina cu cele din lista, ca sa nu se piarda nimic
     const poll = setInterval(async () => {
       try {
         const res = await getLiveChatConversations();
         const items = res.data?.items || [];
         if (items.length > 0) {
           setConversations(prev => {
+            // Conversatiile sunt indexate dupa id; cele noi se adauga, iar cele cu stare schimbata se actualizeaza
             const map = new Map(prev.map(c => [c.conversation_id || c.id, c]));
             for (const item of items) {
               const key = item.conversation_id || item.id;
@@ -220,7 +288,7 @@ export default function LiveChat() {
     return () => clearInterval(poll);
   }, []);
 
-  // Load contacts
+  // Incarca mesajele din formularul de contact
   const loadContacts = useCallback(async () => {
     setContactsLoading(true);
     try {
@@ -230,11 +298,12 @@ export default function LiveChat() {
     setContactsLoading(false);
   }, []);
 
+  // Mesajele de contact se incarca cand se deschide tabul lor
   useEffect(() => {
     if (activeTab === 'contacts') loadContacts();
   }, [activeTab, loadContacts]);
 
-  // Load messages when selecting conversation
+  // Deschide o conversatie si incarca istoricul de mesaje
   const handleSelectConversation = async (convId) => {
     setSelected(convId);
     try {
@@ -243,8 +312,9 @@ export default function LiveChat() {
     } catch { setMessages([]); }
   };
 
-  // Operator typing — throttled
+  // Anuntul ca operatorul scrie este trimis cel mult o data la cateva secunde
   const lastOperatorTyping = useRef(0);
+  // Anunta vizitatorul ca operatorul scrie
   const handleOperatorTyping = () => {
     if (selected && wsRef.current && Date.now() - lastOperatorTyping.current > 2000) {
       lastOperatorTyping.current = Date.now();
@@ -252,7 +322,7 @@ export default function LiveChat() {
     }
   };
 
-  // Send message
+  // Trimite mesajul operatorului catre vizitator
   const handleSend = () => {
     if (!input.trim() || !selected || !wsRef.current) return;
     wsRef.current.send(JSON.stringify({
@@ -264,18 +334,18 @@ export default function LiveChat() {
     }]);
     setInput('');
     setShowCanned(false);
-    // Reset textarea height
+    // Campul de text revine la inaltimea initiala
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
-  // Canned response insert
+  // Pune in campul de mesaj un raspuns predefinit
   const handleCannedResponse = (text) => {
     setInput(text);
     setShowCanned(false);
     textareaRef.current?.focus();
   };
 
-  // Accept / Close / Transfer
+  // Operatorul preia o conversatie aflata in asteptare
   const handleAccept = (convId) => {
     if (!wsRef.current) return;
     wsRef.current.send(JSON.stringify({ type: 'accept_conversation', conversation_id: convId }));
@@ -285,6 +355,7 @@ export default function LiveChat() {
     handleSelectConversation(convId);
   };
 
+  // Operatorul inchide conversatia
   const handleClose = (convId) => {
     if (!wsRef.current) return;
     wsRef.current.send(JSON.stringify({ type: 'close_conversation', conversation_id: convId }));
@@ -292,6 +363,7 @@ export default function LiveChat() {
     if (selected === convId) { setSelected(null); setMessages([]); }
   };
 
+  // Operatorul preda conversatia inapoi botului AI
   const handleTransferToBot = (convId) => {
     if (!wsRef.current) return;
     wsRef.current.send(JSON.stringify({ type: 'transfer_to_bot', conversation_id: convId }));
@@ -299,36 +371,40 @@ export default function LiveChat() {
     if (selected === convId) { setSelected(null); setMessages([]); }
   };
 
-  // Contact actions
+  // Marcheaza un mesaj de contact ca citit
   const handleMarkRead = async (id) => {
     try {
       await markContactRead(id);
       setContacts(prev => prev.map(c => c.id === id ? { ...c, status: 'read' } : c));
-    } catch { addToast('Eroare', 'error'); }
+    } catch (err) { if (!isDemoError(err)) addToast('Eroare', 'error'); }
   };
 
+  // Sterge un mesaj de contact
   const handleDeleteContact = async (id) => {
     try {
       await deleteContact(id);
       setContacts(prev => prev.filter(c => c.id !== id));
       if (selectedContact?.id === id) setSelectedContact(null);
       addToast('Formular sters', 'success');
-    } catch { addToast('Eroare la stergere', 'error'); }
+    } catch (err) { if (!isDemoError(err)) addToast('Eroare la stergere', 'error'); }
   };
 
-  // Filter by current bot
+  // Doar conversatiile botului selectat
   const filteredConvs = conversations.filter(c => !currentBot || c.bot_id === currentBot.bot_id);
+  // Conversatiile in asteptare si cele active ale botului selectat
   const waitingConvs = filteredConvs.filter(c => c.status === 'waiting');
   const activeConvs = filteredConvs.filter(c => c.status === 'live');
+  // Conversatia deschisa in acest moment
   const selectedConv = filteredConvs.find(c => c.conversation_id === selected);
 
   const filteredContacts = useMemo(() =>
     contacts.filter(c => !currentBot || c.bot_id === currentBot.bot_id),
     [contacts, currentBot]
   );
+  // Numarul de mesaje de contact necitite, afisat pe tab
   const unreadContacts = filteredContacts.filter(c => c.status === 'new').length;
 
-  // Auto-resize textarea
+  // Actualizeaza textul mesajului si anunta ca operatorul scrie
   const handleTextareaChange = (e) => {
     setInput(e.target.value);
     handleOperatorTyping();
@@ -354,7 +430,7 @@ export default function LiveChat() {
         }
       />
 
-      {/* Tabs */}
+      {/* Taburi */}
       <div className="flex gap-1 mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
         <button
           onClick={() => setActiveTab('chat')}
@@ -365,6 +441,7 @@ export default function LiveChat() {
           }`}
         >
           Conversatii
+          {/* Insigna cu numarul de conversatii care cer atentie */}
           {(waitingConvs.length + activeConvs.length) > 0 && (
             <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-full">
               {waitingConvs.length + activeConvs.length}
@@ -380,6 +457,7 @@ export default function LiveChat() {
           }`}
         >
           Formulare contact
+          {/* Insigna cu numarul de mesaje de contact necitite */}
           {unreadContacts > 0 && (
             <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full">
               {unreadContacts}
@@ -388,18 +466,20 @@ export default function LiveChat() {
         </button>
       </div>
 
+      {/* Tabul de chat sau tabul de mesaje de contact */}
       {activeTab === 'chat' ? (
-        /* ══════ CHAT TAB ══════ */
+        /* ══════ TABUL DE CHAT ══════ */
         <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)' }}>
-          {/* Left: Conversation list */}
+          {/* Stanga: lista de conversatii */}
           <div className="w-80 flex-shrink-0 bg-white dark:bg-[#111827] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-            {/* Waiting section */}
+            {/* Sectiunea cu conversatiile in asteptare */}
             {waitingConvs.length > 0 && (
               <div className="flex-shrink-0">
                 <div className="px-4 py-2.5 text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   In asteptare ({waitingConvs.length})
                 </div>
+                {/* Fiecare conversatie in asteptare, cu buton de preluare */}
                 {waitingConvs.map(conv => (
                   <ConversationItem
                     key={conv.conversation_id}
@@ -413,14 +493,16 @@ export default function LiveChat() {
               </div>
             )}
 
-            {/* Active section */}
+            {/* Sectiunea cu conversatiile active */}
             <div className="flex-1 overflow-y-auto">
+              {/* Sectiunea cu conversatiile active */}
               {activeConvs.length > 0 && (
                 <div>
                   <div className="px-4 py-2.5 text-xs font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500" />
                     Active ({activeConvs.length})
                   </div>
+                  {/* Fiecare conversatie activa */}
                   {activeConvs.map(conv => (
                     <ConversationItem
                       key={conv.conversation_id}
@@ -432,6 +514,7 @@ export default function LiveChat() {
                 </div>
               )}
 
+              {/* Mesaj afisat cand nu exista nicio conversatie */}
               {filteredConvs.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 p-6 text-center">
                   <svg className="w-12 h-12 mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -444,11 +527,11 @@ export default function LiveChat() {
             </div>
           </div>
 
-          {/* Right: Chat view */}
+          {/* Dreapta: conversatia deschisa */}
           <div className="flex-1 bg-white dark:bg-[#111827] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
             {selected && selectedConv ? (
               <>
-                {/* Chat header */}
+                {/* Antetul conversatiei */}
                 <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
@@ -462,6 +545,7 @@ export default function LiveChat() {
                         <span>{selectedConv.message_count} mesaje</span>
                         <span className="text-gray-300 dark:text-gray-600">|</span>
                         <span>Inceput {formatDate(selectedConv.started_at)}</span>
+                        {/* Indicator de conversatie live in antet */}
                         {selectedConv.status === 'live' && (
                           <>
                             <span className="text-gray-300 dark:text-gray-600">|</span>
@@ -475,6 +559,7 @@ export default function LiveChat() {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    {/* Butonul de preluare apare doar pentru conversatiile in asteptare */}
                     {selectedConv.status === 'waiting' && (
                       <button
                         onClick={() => handleAccept(selected)}
@@ -484,6 +569,7 @@ export default function LiveChat() {
                         Accepta
                       </button>
                     )}
+                    {/* Butoanele de transfer la bot si de inchidere apar doar pentru conversatiile live */}
                     {selectedConv.status === 'live' && (
                       <>
                         <button
@@ -507,11 +593,13 @@ export default function LiveChat() {
                   </div>
                 </div>
 
-                {/* Messages */}
+                {/* Mesaje */}
                 <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                  {/* Fiecare mesaj al conversatiei */}
                   {messages.map((msg, i) => (
                     <ChatMessage key={i} msg={msg} />
                   ))}
+                  {/* Indicatorul ca vizitatorul scrie */}
                   {visitorTyping && (
                     <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500 text-xs py-1">
                       <span className="flex gap-1">
@@ -525,12 +613,13 @@ export default function LiveChat() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input area */}
+                {/* Campul de scris apare doar in conversatiile live */}
                 {selectedConv.status === 'live' && (
                   <div className="border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-                    {/* Canned responses dropdown */}
+                    {/* Lista cu raspunsuri predefinite */}
                     {showCanned && (
                       <div className="px-4 pt-3 pb-1 flex flex-wrap gap-1.5">
+                        {/* Cate un buton pentru fiecare raspuns predefinit */}
                         {CANNED_RESPONSES.map((cr, i) => (
                           <button
                             key={i}
@@ -593,9 +682,9 @@ export default function LiveChat() {
           </div>
         </div>
       ) : (
-        /* ══════ CONTACTS TAB ══════ */
+        /* ══════ TABUL DE CONTACT ══════ */
         <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)' }}>
-          {/* Left: Contact list */}
+          {/* Stanga: lista de mesaje de contact */}
           <div className="w-96 flex-shrink-0 bg-white dark:bg-[#111827] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -608,6 +697,7 @@ export default function LiveChat() {
               )}
             </div>
             <div className="flex-1 overflow-y-auto">
+              {/* Cat timp se incarca apare un indicator, apoi lista de mesaje */}
               {contactsLoading ? (
                 <div className="p-6 text-center text-gray-400 text-sm">Se incarca...</div>
               ) : filteredContacts.length === 0 ? (
@@ -634,6 +724,7 @@ export default function LiveChat() {
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
+                        {/* Punct pentru mesajele necitite */}
                         {contact.status === 'new' && (
                           <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                         )}
@@ -662,8 +753,9 @@ export default function LiveChat() {
             </div>
           </div>
 
-          {/* Right: Contact detail */}
+          {/* Dreapta: detaliile mesajului */}
           <div className="flex-1 bg-white dark:bg-[#111827] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+            {/* Daca nu e ales niciun mesaj apare un indiciu, altfel detaliile lui */}
             {selectedContact ? (
               <div className="p-6">
                 <div className="flex items-start justify-between mb-6">
@@ -699,6 +791,7 @@ export default function LiveChat() {
                     {selectedContact.message}
                   </p>
                 </div>
+                {/* Id-ul sesiunii apare doar daca exista */}
                 {selectedContact.session_id && (
                   <div className="mt-4 text-[11px] text-gray-400">
                     Sesiune: {selectedContact.session_id?.slice(0, 16)}... | Bot: {selectedContact.bot_id}
@@ -723,8 +816,9 @@ export default function LiveChat() {
   );
 }
 
-// ── Conversation list item ─────────────────────────────
+// ── Un element din lista de conversatii ───────────────
 
+// Un element din lista de conversatii, cu butonul de preluare pentru cele in asteptare
 function ConversationItem({ conv, isSelected, onSelect, onAccept, isWaiting }) {
   return (
     <div
@@ -773,8 +867,9 @@ function ConversationItem({ conv, isSelected, onSelect, onAccept, isWaiting }) {
   );
 }
 
-// ── Chat message bubble ────────────────────────────────
+// ── Balonul unui mesaj ─────────────────────────────────
 
+// Un mesaj din conversatie, stilizat dupa expeditor
 function ChatMessage({ msg }) {
   const isUser = msg.role === 'user';
   const isSystem = msg.sender_type === 'system';
@@ -812,7 +907,7 @@ function ChatMessage({ msg }) {
             {isOperator ? 'Tu (Operator)' : 'Bot AI'}
           </div>
         )}
-        <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.content}</div>
+        <div style={{ wordBreak: 'break-word' }}>{renderMarkdown(msg.content)}</div>
         <div className={`text-[10px] mt-1 ${
           isUser ? 'text-gray-400' : isOperator ? 'text-indigo-200' : 'text-blue-400'
         }`}>
