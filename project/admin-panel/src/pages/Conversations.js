@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getConversations, getConversation, deleteConversation, deleteAllConversations } from '../api';
+import { getConversations, getConversation, deleteConversation, deleteAllConversations, isDemoError } from '../api';
 import PageHeader from '../components/PageHeader';
 import ConfirmModal from '../components/ConfirmModal';
 import { ConversationSkeleton, MessageSkeleton } from '../components/Skeleton';
@@ -7,19 +7,69 @@ import { useToast } from '../ToastContext';
 import { useBot } from '../BotContext';
 import { timeAgo, formatDateTime, formatTime } from '../utils';
 
+// Transforma textul ingrosat (**text**) si cursiv (*text*) in elemente React
+function parseInline(text) {
+  const parts = [];
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[2]) parts.push(<strong key={`b${m.index}`} style={{ fontWeight: 600 }}>{m[2]}</strong>);
+    else if (m[3]) parts.push(<em key={`i${m.index}`}>{m[3]}</em>);
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts.length > 0 ? parts : text;
+}
+
+// Randeaza mesajele botului: paragrafe, liste si text formatat
+function renderMarkdown(content) {
+  if (!content) return null;
+  const lines = content.split('\n');
+  const result = [];
+  // Elementele listei curente si tipul ei (ol sau ul), pana cand liniile nu mai sunt de lista
+  let items = [], listType = null;
+  // Aduna elementele strense pana acum intr-o singura lista (ol sau ul) si o adauga la rezultat
+  const flush = () => {
+    if (!items.length) return;
+    const Tag = listType === 'ol' ? 'ol' : 'ul';
+    result.push(
+      <Tag key={`l${result.length}`} style={{ margin: '4px 0', paddingLeft: '18px', listStyleType: listType === 'ol' ? 'decimal' : 'disc' }}>
+        {items.map((it, i) => <li key={i} style={{ marginBottom: '2px' }}>{parseInline(it)}</li>)}
+      </Tag>
+    );
+    items = []; listType = null;
+  };
+  // Fiecare linie este element numerotat, element cu buline sau paragraf
+  lines.forEach((line, idx) => {
+    const t = line.trim();
+    const ol = t.match(/^\d+[.)]\s+(.+)/);
+    const ul = t.match(/^[-*]\s+(.+)/);
+    if (ol) { if (listType !== 'ol') flush(); listType = 'ol'; items.push(ol[1]); }
+    else if (ul) { if (listType !== 'ul') flush(); listType = 'ul'; items.push(ul[1]); }
+    else { flush(); result.push(t === '' ? <div key={`s${idx}`} style={{ height: '6px' }} /> : <div key={`p${idx}`}>{parseInline(t)}</div>); }
+  });
+  flush();
+  return result;
+}
+
 const PER_PAGE_OPTIONS = [15, 30, 50];
 
+// Pagina cu conversatiile botului selectat: lista paginata, cautare, sortare si vizualizarea mesajelor
 export default function Conversations() {
+  // Mesajele temporare si botul selectat
   const { addToast } = useToast();
   const { selectedBotId } = useBot();
+  // Lista conversatiilor, conversatia deschisa si detaliile ei
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  // Starea ferestrei de confirmare, cu mesajul si actiunea ei
   const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: () => {} });
 
-  // Pagination & filters
+  // Paginare si filtre
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
   const [totalItems, setTotalItems] = useState(0);
@@ -28,6 +78,7 @@ export default function Conversations() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
 
+  // Incarca pagina curenta de conversatii, cu cautarea si sortarea aplicate
   const loadConversations = useCallback(() => {
     setLoading(true);
     getConversations({ page, per_page: perPage, sort: sortBy, search: searchQuery, bot_id: selectedBotId })
@@ -40,11 +91,12 @@ export default function Conversations() {
       .finally(() => setLoading(false));
   }, [page, perPage, sortBy, searchQuery, selectedBotId, addToast]);
 
+  // Conversatiile se reincarca de fiecare data cand se schimba pagina, filtrele sau botul
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
 
-  // Debounced search
+  // Cautarea porneste dupa o scurta pauza de la ultima tasta
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchInput);
@@ -53,6 +105,7 @@ export default function Conversations() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // Deschide o conversatie si incarca mesajele ei
   const selectConversation = (conv) => {
     setSelected(conv.id);
     setLoadingDetail(true);
@@ -61,50 +114,56 @@ export default function Conversations() {
       .finally(() => setLoadingDetail(false));
   };
 
+  // Sterge o conversatie dupa confirmare
   const handleDelete = (id, e) => {
     e.stopPropagation();
     setConfirmModal({
       open: true,
       title: 'Sterge conversatia',
       message: 'Sigur vrei sa stergi aceasta conversatie? Aceasta actiune nu poate fi anulata.',
+      // Actiunea rulata dupa confirmare: sterge conversatia si reincarca lista
       onConfirm: async () => {
-        await deleteConversation(id);
-        if (selected === id) {
-          setSelected(null);
-          setDetail(null);
-        }
-        addToast('Conversatie stearsa.', 'success');
-        loadConversations();
+        try {
+          await deleteConversation(id);
+          if (selected === id) { setSelected(null); setDetail(null); }
+          addToast('Conversatie stearsa.', 'success');
+          loadConversations();
+        } catch (err) { if (!isDemoError(err)) addToast('Eroare la stergere.', 'error'); }
       },
     });
   };
 
+  // Sterge toate conversatiile botului dupa confirmare
   const handleDeleteAll = () => {
     setConfirmModal({
       open: true,
       title: 'Sterge TOATE conversatiile',
       message: `Sigur vrei sa stergi toate cele ${totalItems} conversatii? Aceasta actiune nu poate fi anulata.`,
+      // Actiunea rulata dupa confirmare: sterge toate conversatiile botului
       onConfirm: async () => {
-        await deleteAllConversations(selectedBotId);
-        setSelected(null);
-        setDetail(null);
-        addToast('Toate conversatiile au fost sterse.', 'success');
-        setPage(1);
-        loadConversations();
+        try {
+          await deleteAllConversations(selectedBotId);
+          setSelected(null); setDetail(null);
+          addToast('Toate conversatiile au fost sterse.', 'success');
+          setPage(1); loadConversations();
+        } catch (err) { if (!isDemoError(err)) addToast('Eroare la stergere.', 'error'); }
       },
     });
   };
 
+  // Schimba ordinea listei si revine la prima pagina
   const handleSort = (newSort) => {
     setSortBy(newSort);
     setPage(1);
   };
 
+  // Schimba numarul de conversatii pe pagina si revine la prima pagina
   const handlePerPage = (newPerPage) => {
     setPerPage(newPerPage);
     setPage(1);
   };
 
+  // Optiunile de sortare afisate in lista
   const sortOptions = [
     { value: 'newest', label: 'Cele mai noi' },
     { value: 'oldest', label: 'Cele mai vechi' },
@@ -132,11 +191,11 @@ export default function Conversations() {
       />
 
       <div className="grid grid-cols-3 gap-6 h-[calc(100vh-220px)] min-h-[500px]">
-        {/* Left: Conversation List */}
+        {/* Stanga: lista de conversatii */}
         <div className="col-span-1 bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
-          {/* Header controls */}
+          {/* Controalele din antet */}
           <div className="p-4 border-b border-gray-100 dark:border-gray-700 space-y-3 flex-shrink-0">
-            {/* Search */}
+            {/* Cautare */}
             <div className="relative">
               <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -150,13 +209,14 @@ export default function Conversations() {
               />
             </div>
 
-            {/* Sort + per page */}
+            {/* Sortare si numar de elemente pe pagina */}
             <div className="flex items-center gap-2">
               <select
                 value={sortBy}
                 onChange={(e) => handleSort(e.target.value)}
                 className="flex-1 text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               >
+                {/* Cate o optiune pentru fiecare tip de sortare */}
                 {sortOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
@@ -166,6 +226,7 @@ export default function Conversations() {
                 onChange={(e) => handlePerPage(Number(e.target.value))}
                 className="text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-16"
               >
+                {/* Cate o optiune pentru numarul de elemente pe pagina */}
                 {PER_PAGE_OPTIONS.map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
@@ -173,8 +234,9 @@ export default function Conversations() {
             </div>
           </div>
 
-          {/* Conversation list - scrollable */}
+          {/* Lista de conversatii, cu derulare */}
           <div className="flex-1 overflow-y-auto min-h-0">
+            {/* Cat timp se incarca apar placeholder-e, apoi conversatiile */}
             {loading ? (
               <>
                 <ConversationSkeleton />
@@ -228,7 +290,7 @@ export default function Conversations() {
             )}
           </div>
 
-          {/* Pagination footer */}
+          {/* Paginarea apare doar daca exista mai multe pagini */}
           {totalPages > 1 && (
             <div className="p-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
               <span className="text-[11px] text-gray-400">
@@ -280,8 +342,9 @@ export default function Conversations() {
           )}
         </div>
 
-        {/* Right: Conversation Detail */}
+        {/* Dreapta: detaliile conversatiei */}
         <div className="col-span-2 bg-white dark:bg-dark-light rounded-xl border-2 border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
+          {/* Daca nu e aleasa nicio conversatie apare un mesaj, altfel placeholder-e sau mesajele */}
           {!detail && !loadingDetail ? (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
               <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +362,7 @@ export default function Conversations() {
             </div>
           ) : detail && (
             <>
-              {/* Header */}
+              {/* Antet */}
               <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                 <div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -320,8 +383,9 @@ export default function Conversations() {
                 </button>
               </div>
 
-              {/* Messages - scrollable */}
+              {/* Mesajele, cu derulare */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+                {/* Fiecare mesaj al conversatiei, aliniat dupa expeditor */}
                 {detail.messages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
@@ -339,7 +403,7 @@ export default function Conversations() {
                           style={{ maxHeight: '200px' }}
                         />
                       )}
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      <div className="text-sm leading-relaxed" style={{ wordBreak: 'break-word' }}>{renderMarkdown(msg.content)}</div>
                       <p className={`text-[10px] mt-1 ${
                         msg.role === 'user' ? 'text-white/50' : 'text-gray-400'
                       }`}>
@@ -354,7 +418,7 @@ export default function Conversations() {
         </div>
       </div>
 
-      {/* Confirm Modal */}
+      {/* Fereastra de confirmare */}
       <ConfirmModal
         open={confirmModal.open}
         onClose={() => setConfirmModal({ ...confirmModal, open: false })}
