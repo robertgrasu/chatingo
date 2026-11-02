@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="620" fill="#ffffff"/>
+
+  <!-- Site client / Widget -->
+  <rect x="40" y="40" width="280" height="150" rx="14" fill="#eef2ff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <text x="180" y="66" text-anchor="middle" font-size="14" fill="#4338ca" font-weight="600">SITE CLIENT</text>
+  <rect x="64" y="86" width="232" height="80" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="180" y="118" text-anchor="middle" font-size="17" fill="#1f2937" font-weight="700">Widget Chatingo</text>
+  <text x="180" y="140" text-anchor="middle" font-size="12.5" fill="#6b7280">React · Webpack · 1 script tag</text>
+
+  <!-- Admin Panel -->
+  <rect x="680" y="40" width="280" height="150" rx="14" fill="#eef2ff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <text x="820" y="66" text-anchor="middle" font-size="14" fill="#4338ca" font-weight="600">ADMINISTRATOR</text>
+  <rect x="704" y="86" width="232" height="80" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="820" y="113" text-anchor="middle" font-size="17" fill="#1f2937" font-weight="700">Admin Panel</text>
+  <text x="820" y="134" text-anchor="middle" font-size="12.5" fill="#6b7280">React · Tailwind</text>
+  <text x="820" y="151" text-anchor="middle" font-size="12.5" fill="#6b7280">JWT · operator live chat</text>
+
+  <!-- Backend -->
+  <rect x="330" y="290" width="340" height="110" rx="14" fill="#1f2937"/>
+  <text x="500" y="332" text-anchor="middle" font-size="19" fill="#ffffff" font-weight="700">Backend</text>
+  <text x="500" y="355" text-anchor="middle" font-size="13" fill="#d1d5db">FastAPI · Python</text>
+  <text x="500" y="375" text-anchor="middle" font-size="12" fill="#9ca3af">REST + WebSocket · RAG · auth JWT</text>
+
+  <!-- PostgreSQL -->
+  <rect x="80" y="470" width="220" height="100" rx="14" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="190" y="508" text-anchor="middle" font-size="16" fill="#1f2937" font-weight="700">PostgreSQL</text>
+  <text x="190" y="529" text-anchor="middle" font-size="12.5" fill="#6b7280">boți, useri, conversații,</text>
+  <text x="190" y="546" text-anchor="middle" font-size="12.5" fill="#6b7280">mesaje, notificări</text>
+
+  <!-- ChromaDB -->
+  <rect x="390" y="470" width="220" height="100" rx="14" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="500" y="508" text-anchor="middle" font-size="16" fill="#1f2937" font-weight="700">ChromaDB</text>
+  <text x="500" y="529" text-anchor="middle" font-size="12.5" fill="#6b7280">embeddings pe documente,</text>
+  <text x="500" y="546" text-anchor="middle" font-size="12.5" fill="#6b7280">izolate per bot</text>
+
+  <!-- OpenAI -->
+  <rect x="700" y="470" width="220" height="100" rx="14" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="810" y="508" text-anchor="middle" font-size="16" fill="#1f2937" font-weight="700">OpenAI API</text>
+  <text x="810" y="529" text-anchor="middle" font-size="12.5" fill="#6b7280">chat completions</text>
+  <text x="810" y="546" text-anchor="middle" font-size="12.5" fill="#6b7280">+ embeddings</text>
+
+  <!-- Arrows: widget -> backend -->
+  <path d="M220,166 C260,220 350,250 430,288" fill="none" stroke="#6366f1" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="225" y="235" font-size="11.5" fill="#4338ca">REST public (filtrat pe domeniu)</text>
+  <text x="225" y="251" font-size="11.5" fill="#4338ca">+ WebSocket live chat</text>
+
+  <!-- Arrows: admin -> backend -->
+  <path d="M780,166 C740,220 650,250 570,288" fill="none" stroke="#6366f1" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="615" y="235" font-size="11.5" fill="#4338ca" text-anchor="end">REST + WebSocket</text>
+  <text x="615" y="251" font-size="11.5" fill="#4338ca" text-anchor="end">operator (JWT)</text>
+
+  <!-- Arrows: backend -> data stores -->
+  <path d="M430,400 C370,430 260,448 195,468" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M500,400 L500,468" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M570,400 C630,430 740,448 805,468" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Legend -->
+  <line x1="40" y1="600" x2="70" y2="600" stroke="#6366f1" stroke-width="2"/>
+  <text x="78" y="604" font-size="12" fill="#6b7280">trafic client (public / autentificat)</text>
+  <line x1="330" y1="600" x2="360" y2="600" stroke="#9ca3af" stroke-width="2"/>
+  <text x="368" y="604" font-size="12" fill="#6b7280">trafic intern backend</text>
+</svg>

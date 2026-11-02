@@ -2,7 +2,7 @@
 
 Chatingo este o platformă de chat pentru site-uri web, care combină un bot cu răspunsuri automate, preluarea manuală a conversațiilor de către un operator uman și un panou de administrare din care totul se configurează vizual. Widget-ul se instalează pe orice site printr-un singur snippet de cod.
 
-Proiect realizat de Grasu Robert-Nicolae. Acest repository conține doar o prezentare vizuală, fără codul sursă. Pentru mai multe detalii, mă puteți contacta la robert.grasu@rgsoft.ro
+Proiect realizat de Grasu Robert-Nicolae. Pentru mai multe detalii, mă puteți contacta la robert.grasu@rgsoft.ro
 
 **Demo live:** [chat.rgsoft.ro](https://chat.rgsoft.ro/login?demo=1)
 
@@ -25,13 +25,25 @@ Proiect realizat de Grasu Robert-Nicolae. Acest repository conține doar o preze
 
 | Categorie | Tehnologii |
 |---|---|
-| Frontend | React, Tailwind CSS |
-| Widget | React, Webpack |
+| Frontend | React, Tailwind CSS, Node.js |
+| Widget | React, Webpack, Node.js |
 | Backend | Python, FastAPI |
 | Bază de date | PostgreSQL, SQLAlchemy |
 | Căutare semantică | ChromaDB |
 | Model de limbaj | OpenAI API |
 | Infrastructură | Docker |
+
+---
+
+## Arhitectură
+
+Trei module independente, legate doar prin backend:
+
+- **Widget-ul** rulează pe site-ul clientului, fără autentificare. Accesul e controlat prin lista de domenii permise ale fiecărui bot. Vorbește cu backend-ul prin REST (configurare, chat simplu) sau prin WebSocket, dacă live chat-ul e activat pentru bot.
+- **Panoul de administrare** e protejat prin autentificare JWT și comunică tot prin REST (CRUD pe boți, documente, conversații) plus un canal WebSocket separat, pentru notificările operatorilor în timp real.
+- **Backend-ul** (FastAPI) e singurul punct central: ține datele relaționale în PostgreSQL, indexează documentele ca embeddings în ChromaDB pentru căutare semantică, izolate per bot, și folosește OpenAI atât pentru generarea răspunsurilor, cât și pentru embeddings.
+
+![Arhitectură](assets/architecture.svg)
 
 ---
 
